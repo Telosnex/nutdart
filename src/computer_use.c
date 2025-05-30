@@ -1,11 +1,11 @@
 #include "computer_use.h"
-#include "src/mouse.h"
-#include "src/keypress.h"
-#include "src/screen.h"
-#include "src/screengrab.h"
-#include "src/microsleep.h"
-#include "src/keycode.h"
-#include "src/MMBitmap.h"
+#include "mouse.h"
+#include "keypress.h"
+#include "screen.h"
+#include "screengrab.h"
+#include "microsleep.h"
+#include "keycode.h"
+#include "MMBitmap.h"
 #include <stdlib.h>
 #include <string.h>
 

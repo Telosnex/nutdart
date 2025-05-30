@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.10)
 
-enable_language(Swift)
+project(computer_use VERSION 0.0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
@@ -16,9 +16,9 @@ endif()
 
 # Source files from libnut-core
 set(COMMON_SOURCES
-    MMBitmap.c
-    deadbeef_rand.c
     computer_use.c
+    deadbeef_rand.c
+    MMBitmap.c
 )
 
 # Platform-specific sources
@@ -42,8 +42,7 @@ elseif(APPLE)
         macos/mouse_utils.mm
         macos/window_manager.mm
         macos/highlightwindow.m
-        macos/screencapturekit_bridge.mm
-        macos/ScreenCaptureKitWrapper.swift
+        macos/screencapturekit_objc.m
     )
     find_library(CARBON_FRAMEWORK Carbon)
     find_library(COCOA_FRAMEWORK Cocoa)
@@ -85,7 +84,7 @@ endif()
 add_library(computer_use SHARED ${COMMON_SOURCES} ${PLATFORM_SOURCES})
 
 # Include directories
-target_include_directories(computer_use PRIVATE src)
+target_include_directories(computer_use PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Link libraries
 target_link_libraries(computer_use ${PLATFORM_LIBS})
@@ -108,24 +107,9 @@ target_compile_definitions(computer_use PUBLIC DART_SHARED_LIB)
 set_target_properties(computer_use PROPERTIES
     PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/computer_use.h"
     OUTPUT_NAME "computer_use"
-    PREFIX ""
 )
 
-# Set output directory based on platform
-if(WIN32)
-    set_target_properties(computer_use PROPERTIES
-        WINDOWS_EXPORT_ALL_SYMBOLS ON
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../windows"
-        SUFFIX ".dll"
-    )
-elseif(APPLE)
-    set_target_properties(computer_use PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../macos"
-        SUFFIX ".dylib"
-    )
-elseif(UNIX)
-    set_target_properties(computer_use PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../linux"
-        SUFFIX ".so"
-    )
+if (ANDROID)
+  # Support Android 15 16k page size
+  target_link_options(nutdart PRIVATE "-Wl,-z,max-page-size=16384")
 endif()

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(computer_use VERSION 0.0.1 LANGUAGES C CXX)
+project(nutdart VERSION 0.0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
@@ -81,13 +81,13 @@ elseif(UNIX)
 endif()
 
 # Create the shared library
-add_library(computer_use SHARED ${COMMON_SOURCES} ${PLATFORM_SOURCES})
+add_library(nutdart SHARED ${COMMON_SOURCES} ${PLATFORM_SOURCES})
 
 # Include directories
-target_include_directories(computer_use PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(nutdart PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Link libraries
-target_link_libraries(computer_use ${PLATFORM_LIBS})
+target_link_libraries(nutdart ${PLATFORM_LIBS})
 
 # TODO: Commented out below block while following https://codelabs.developers.google.com/codelabs/flutter-ffigen#4
 # Compiler-specific flags
@@ -100,13 +100,13 @@ target_link_libraries(computer_use ${PLATFORM_LIBS})
 #     )
 # endif()
 
-target_compile_definitions(computer_use PUBLIC DART_SHARED_LIB)
+target_compile_definitions(nutdart PUBLIC DART_SHARED_LIB)
 
 
 # Output configuration
-set_target_properties(computer_use PROPERTIES
+set_target_properties(nutdart PROPERTIES
     PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/computer_use.h"
-    OUTPUT_NAME "computer_use"
+    OUTPUT_NAME "nutdart"
 )
 
 if (ANDROID)

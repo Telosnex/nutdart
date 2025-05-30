@@ -1,6 +1,6 @@
 #pragma once
-#ifndef COMPUTER_USE_H
-#define COMPUTER_USE_H
+#ifndef NUTDART_H
+#define NUTDART_H
 
 #include <stdint.h>
 
@@ -87,4 +87,4 @@ void cu_sleep_ms(int milliseconds);
 }
 #endif
 
-#endif // COMPUTER_USE_H
+#endif // NUTDART_H

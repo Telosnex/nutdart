@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-#include "computer_use.h"
+#include "nutdart.h"
 
 // Only available on macOS 12+ (ScreenCaptureKit)
 // Returns NULL if ScreenCaptureKit is not available or permission denied.

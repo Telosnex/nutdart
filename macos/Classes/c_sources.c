@@ -3,6 +3,6 @@
 #include "../../src/macos/keypress.c"
 #include "../../src/macos/mouse.c"
 #include "../../src/macos/screen.c"
-#include "../../src/computer_use.c"
+#include "../../src/nutdart.c"
 #include "../../src/deadbeef_rand.c"
 #include "../../src/MMBitmap.c"

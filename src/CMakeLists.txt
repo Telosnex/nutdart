@@ -16,7 +16,7 @@ endif()
 
 # Source files from libnut-core
 set(COMMON_SOURCES
-    computer_use.c
+    nutdart.c
     deadbeef_rand.c
     MMBitmap.c
 )
@@ -105,7 +105,7 @@ target_compile_definitions(nutdart PUBLIC DART_SHARED_LIB)
 
 # Output configuration
 set_target_properties(nutdart PROPERTIES
-    PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/computer_use.h"
+    PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/nutdart.h"
     OUTPUT_NAME "nutdart"
 )
 

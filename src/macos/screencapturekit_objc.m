@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
 #import "../screencapturekit_bridge.h"
-#import "../computer_use.h"
+#import "../nutdart.h"
 
 #if __has_include(<ScreenCaptureKit/ScreenCaptureKit.h>)
 #import <ScreenCaptureKit/ScreenCaptureKit.h>

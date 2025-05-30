@@ -7,9 +7,9 @@ description: |
 output: 'lib/nutdart_bindings_generated.dart'
 headers:
   entry-points:
-    - 'src/nutdart.h'
+    - 'src/computer_use.h'
   include-directives:
-    - 'src/nutdart.h'
+    - 'src/computer_use.h'
 preamble: |
   // ignore_for_file: always_specify_types
   // ignore_for_file: camel_case_types

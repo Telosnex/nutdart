@@ -27,43 +27,387 @@ class NutdartBindings {
           lookup)
       : _lookup = lookup;
 
-  /// A very short-lived native function.
-  ///
-  /// For very short-lived functions, it is fine to call them on the main isolate.
-  /// They will block the Dart execution while running the native function, so
-  /// only do this for native functions which are guaranteed to be short-lived.
-  int sum(
-    int a,
-    int b,
+  /// Mouse functions
+  void cu_mouse_move(
+    int x,
+    int y,
   ) {
-    return _sum(
-      a,
-      b,
+    return _cu_mouse_move(
+      x,
+      y,
     );
   }
 
-  late final _sumPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>('sum');
-  late final _sum = _sumPtr.asFunction<int Function(int, int)>();
+  late final _cu_mouse_movePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int64, ffi.Int64)>>(
+          'cu_mouse_move');
+  late final _cu_mouse_move =
+      _cu_mouse_movePtr.asFunction<void Function(int, int)>();
 
-  /// A longer lived native function, which occupies the thread calling it.
-  ///
-  /// Do not call these kind of native functions in the main isolate. They will
-  /// block Dart execution. This will cause dropped frames in Flutter applications.
-  /// Instead, call these native functions on a separate isolate.
-  int sum_long_running(
-    int a,
-    int b,
+  void cu_mouse_click(
+    int button,
   ) {
-    return _sum_long_running(
-      a,
-      b,
+    return _cu_mouse_click(
+      button,
     );
   }
 
-  late final _sum_long_runningPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>(
-          'sum_long_running');
-  late final _sum_long_running =
-      _sum_long_runningPtr.asFunction<int Function(int, int)>();
+  late final _cu_mouse_clickPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>('cu_mouse_click');
+  late final _cu_mouse_click =
+      _cu_mouse_clickPtr.asFunction<void Function(int)>();
+
+  void cu_mouse_double_click(
+    int button,
+  ) {
+    return _cu_mouse_double_click(
+      button,
+    );
+  }
+
+  late final _cu_mouse_double_clickPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>(
+          'cu_mouse_double_click');
+  late final _cu_mouse_double_click =
+      _cu_mouse_double_clickPtr.asFunction<void Function(int)>();
+
+  void cu_mouse_drag(
+    int fromX,
+    int fromY,
+    int toX,
+    int toY,
+    int button,
+  ) {
+    return _cu_mouse_drag(
+      fromX,
+      fromY,
+      toX,
+      toY,
+      button,
+    );
+  }
+
+  late final _cu_mouse_dragPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Void Function(ffi.Int64, ffi.Int64, ffi.Int64, ffi.Int64,
+              ffi.Int)>>('cu_mouse_drag');
+  late final _cu_mouse_drag =
+      _cu_mouse_dragPtr.asFunction<void Function(int, int, int, int, int)>();
+
+  void cu_mouse_scroll(
+    int deltaX,
+    int deltaY,
+  ) {
+    return _cu_mouse_scroll(
+      deltaX,
+      deltaY,
+    );
+  }
+
+  late final _cu_mouse_scrollPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int, ffi.Int)>>(
+          'cu_mouse_scroll');
+  late final _cu_mouse_scroll =
+      _cu_mouse_scrollPtr.asFunction<void Function(int, int)>();
+
+  CUPoint cu_mouse_get_position() {
+    return _cu_mouse_get_position();
+  }
+
+  late final _cu_mouse_get_positionPtr =
+      _lookup<ffi.NativeFunction<CUPoint Function()>>('cu_mouse_get_position');
+  late final _cu_mouse_get_position =
+      _cu_mouse_get_positionPtr.asFunction<CUPoint Function()>();
+
+  void cu_mouse_toggle(
+    int down,
+    int button,
+  ) {
+    return _cu_mouse_toggle(
+      down,
+      button,
+    );
+  }
+
+  late final _cu_mouse_togglePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int, ffi.Int)>>(
+          'cu_mouse_toggle');
+  late final _cu_mouse_toggle =
+      _cu_mouse_togglePtr.asFunction<void Function(int, int)>();
+
+  /// Keyboard functions (using libnut-core key names)
+  void cu_keyboard_key_tap(
+    ffi.Pointer<ffi.Char> key,
+  ) {
+    return _cu_keyboard_key_tap(
+      key,
+    );
+  }
+
+  late final _cu_keyboard_key_tapPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Char>)>>(
+          'cu_keyboard_key_tap');
+  late final _cu_keyboard_key_tap = _cu_keyboard_key_tapPtr
+      .asFunction<void Function(ffi.Pointer<ffi.Char>)>();
+
+  void cu_keyboard_key_tap_with_flags(
+    ffi.Pointer<ffi.Char> key,
+    ffi.Pointer<ffi.Char> flags,
+  ) {
+    return _cu_keyboard_key_tap_with_flags(
+      key,
+      flags,
+    );
+  }
+
+  late final _cu_keyboard_key_tap_with_flagsPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Void Function(ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>)>>('cu_keyboard_key_tap_with_flags');
+  late final _cu_keyboard_key_tap_with_flags =
+      _cu_keyboard_key_tap_with_flagsPtr.asFunction<
+          void Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)>();
+
+  void cu_keyboard_type_string(
+    ffi.Pointer<ffi.Char> text,
+  ) {
+    return _cu_keyboard_type_string(
+      text,
+    );
+  }
+
+  late final _cu_keyboard_type_stringPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Char>)>>(
+          'cu_keyboard_type_string');
+  late final _cu_keyboard_type_string = _cu_keyboard_type_stringPtr
+      .asFunction<void Function(ffi.Pointer<ffi.Char>)>();
+
+  void cu_keyboard_key_down(
+    ffi.Pointer<ffi.Char> key,
+  ) {
+    return _cu_keyboard_key_down(
+      key,
+    );
+  }
+
+  late final _cu_keyboard_key_downPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Char>)>>(
+          'cu_keyboard_key_down');
+  late final _cu_keyboard_key_down = _cu_keyboard_key_downPtr
+      .asFunction<void Function(ffi.Pointer<ffi.Char>)>();
+
+  void cu_keyboard_key_up(
+    ffi.Pointer<ffi.Char> key,
+  ) {
+    return _cu_keyboard_key_up(
+      key,
+    );
+  }
+
+  late final _cu_keyboard_key_upPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Char>)>>(
+          'cu_keyboard_key_up');
+  late final _cu_keyboard_key_up =
+      _cu_keyboard_key_upPtr.asFunction<void Function(ffi.Pointer<ffi.Char>)>();
+
+  /// Screen functions
+  CUSize cu_screen_get_size() {
+    return _cu_screen_get_size();
+  }
+
+  late final _cu_screen_get_sizePtr =
+      _lookup<ffi.NativeFunction<CUSize Function()>>('cu_screen_get_size');
+  late final _cu_screen_get_size =
+      _cu_screen_get_sizePtr.asFunction<CUSize Function()>();
+
+  ffi.Pointer<CUBitmap> cu_screen_capture_region(
+    int x,
+    int y,
+    int width,
+    int height,
+  ) {
+    return _cu_screen_capture_region(
+      x,
+      y,
+      width,
+      height,
+    );
+  }
+
+  late final _cu_screen_capture_regionPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Pointer<CUBitmap> Function(ffi.Int64, ffi.Int64, ffi.Int64,
+              ffi.Int64)>>('cu_screen_capture_region');
+  late final _cu_screen_capture_region = _cu_screen_capture_regionPtr
+      .asFunction<ffi.Pointer<CUBitmap> Function(int, int, int, int)>();
+
+  ffi.Pointer<CUBitmap> cu_screen_capture_full() {
+    return _cu_screen_capture_full();
+  }
+
+  late final _cu_screen_capture_fullPtr =
+      _lookup<ffi.NativeFunction<ffi.Pointer<CUBitmap> Function()>>(
+          'cu_screen_capture_full');
+  late final _cu_screen_capture_full =
+      _cu_screen_capture_fullPtr.asFunction<ffi.Pointer<CUBitmap> Function()>();
+
+  void cu_screen_free_capture(
+    ffi.Pointer<CUBitmap> bitmap,
+  ) {
+    return _cu_screen_free_capture(
+      bitmap,
+    );
+  }
+
+  late final _cu_screen_free_capturePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<CUBitmap>)>>(
+          'cu_screen_free_capture');
+  late final _cu_screen_free_capture = _cu_screen_free_capturePtr
+      .asFunction<void Function(ffi.Pointer<CUBitmap>)>();
+
+  /// JPEG screenshot functions with resizing
+  /// maxSmallDim/maxLargeDim: -1 means no limit
+  /// quality: 0-100 (JPEG quality)
+  /// outSize: pointer to receive the size of the returned JPEG data
+  ffi.Pointer<ffi.Uint8> cu_screen_capture_region_jpeg(
+    int x,
+    int y,
+    int width,
+    int height,
+    int maxSmallDim,
+    int maxLargeDim,
+    int quality,
+    ffi.Pointer<ffi.Int64> outSize,
+  ) {
+    return _cu_screen_capture_region_jpeg(
+      x,
+      y,
+      width,
+      height,
+      maxSmallDim,
+      maxLargeDim,
+      quality,
+      outSize,
+    );
+  }
+
+  late final _cu_screen_capture_region_jpegPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Pointer<ffi.Uint8> Function(
+              ffi.Int64,
+              ffi.Int64,
+              ffi.Int64,
+              ffi.Int64,
+              ffi.Int32,
+              ffi.Int32,
+              ffi.Int32,
+              ffi.Pointer<ffi.Int64>)>>('cu_screen_capture_region_jpeg');
+  late final _cu_screen_capture_region_jpeg =
+      _cu_screen_capture_region_jpegPtr.asFunction<
+          ffi.Pointer<ffi.Uint8> Function(
+              int, int, int, int, int, int, int, ffi.Pointer<ffi.Int64>)>();
+
+  ffi.Pointer<ffi.Uint8> cu_screen_capture_full_jpeg(
+    int maxSmallDim,
+    int maxLargeDim,
+    int quality,
+    ffi.Pointer<ffi.Int64> outSize,
+  ) {
+    return _cu_screen_capture_full_jpeg(
+      maxSmallDim,
+      maxLargeDim,
+      quality,
+      outSize,
+    );
+  }
+
+  late final _cu_screen_capture_full_jpegPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Pointer<ffi.Uint8> Function(ffi.Int32, ffi.Int32, ffi.Int32,
+              ffi.Pointer<ffi.Int64>)>>('cu_screen_capture_full_jpeg');
+  late final _cu_screen_capture_full_jpeg =
+      _cu_screen_capture_full_jpegPtr.asFunction<
+          ffi.Pointer<ffi.Uint8> Function(
+              int, int, int, ffi.Pointer<ffi.Int64>)>();
+
+  void cu_screen_free_jpeg(
+    ffi.Pointer<ffi.Uint8> data,
+  ) {
+    return _cu_screen_free_jpeg(
+      data,
+    );
+  }
+
+  late final _cu_screen_free_jpegPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Uint8>)>>(
+          'cu_screen_free_jpeg');
+  late final _cu_screen_free_jpeg = _cu_screen_free_jpegPtr
+      .asFunction<void Function(ffi.Pointer<ffi.Uint8>)>();
+
+  /// Utility functions
+  void cu_sleep_ms(
+    int milliseconds,
+  ) {
+    return _cu_sleep_ms(
+      milliseconds,
+    );
+  }
+
+  late final _cu_sleep_msPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>('cu_sleep_ms');
+  late final _cu_sleep_ms = _cu_sleep_msPtr.asFunction<void Function(int)>();
 }
+
+/// Basic types matching libnut-core but simplified for FFI
+final class CUPoint extends ffi.Struct {
+  @ffi.Int64()
+  external int x;
+
+  @ffi.Int64()
+  external int y;
+}
+
+final class CUSize extends ffi.Struct {
+  @ffi.Int64()
+  external int width;
+
+  @ffi.Int64()
+  external int height;
+}
+
+final class CUColor extends ffi.Struct {
+  @ffi.Uint8()
+  external int r;
+
+  @ffi.Uint8()
+  external int g;
+
+  @ffi.Uint8()
+  external int b;
+}
+
+/// Screenshot functions (returns raw bitmap data)
+final class CUBitmap extends ffi.Struct {
+  external ffi.Pointer<ffi.Uint8> data;
+
+  @ffi.Int64()
+  external int width;
+
+  @ffi.Int64()
+  external int height;
+
+  @ffi.Int64()
+  external int bytewidth;
+
+  @ffi.Uint8()
+  external int bitsPerPixel;
+
+  @ffi.Uint8()
+  external int bytesPerPixel;
+}
+
+const int CU_MOUSE_LEFT = 1;
+
+const int CU_MOUSE_MIDDLE = 2;
+
+const int CU_MOUSE_RIGHT = 3;

@@ -90,18 +90,23 @@ target_include_directories(computer_use PRIVATE src)
 # Link libraries
 target_link_libraries(computer_use ${PLATFORM_LIBS})
 
+# TODO: Commented out below block while following https://codelabs.developers.google.com/codelabs/flutter-ffigen#4
 # Compiler-specific flags
-if(WIN32)
-    target_compile_definitions(computer_use PRIVATE _CRT_SECURE_NO_WARNINGS)
-elseif(APPLE)
-    set_target_properties(computer_use PROPERTIES
-        MACOSX_RPATH TRUE
-        BUILD_WITH_INSTALL_RPATH TRUE
-    )
-endif()
+# if(WIN32)
+#     target_compile_definitions(computer_use PRIVATE _CRT_SECURE_NO_WARNINGS)
+# elseif(APPLE)
+#     set_target_properties(computer_use PROPERTIES
+#         MACOSX_RPATH TRUE
+#         BUILD_WITH_INSTALL_RPATH TRUE
+#     )
+# endif()
+
+target_compile_definitions(computer_use PUBLIC DART_SHARED_LIB)
+
 
 # Output configuration
 set_target_properties(computer_use PROPERTIES
+    PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/computer_use.h"
     OUTPUT_NAME "computer_use"
     PREFIX ""
 )
@@ -109,6 +114,7 @@ set_target_properties(computer_use PROPERTIES
 # Set output directory based on platform
 if(WIN32)
     set_target_properties(computer_use PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../windows"
         SUFFIX ".dll"
     )

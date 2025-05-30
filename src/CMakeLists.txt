@@ -89,19 +89,7 @@ target_include_directories(nutdart PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # Link libraries
 target_link_libraries(nutdart ${PLATFORM_LIBS})
 
-# TODO: Commented out below block while following https://codelabs.developers.google.com/codelabs/flutter-ffigen#4
-# Compiler-specific flags
-# if(WIN32)
-#     target_compile_definitions(computer_use PRIVATE _CRT_SECURE_NO_WARNINGS)
-# elseif(APPLE)
-#     set_target_properties(computer_use PROPERTIES
-#         MACOSX_RPATH TRUE
-#         BUILD_WITH_INSTALL_RPATH TRUE
-#     )
-# endif()
-
 target_compile_definitions(nutdart PUBLIC DART_SHARED_LIB)
-
 
 # Output configuration
 set_target_properties(nutdart PROPERTIES

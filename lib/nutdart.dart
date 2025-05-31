@@ -408,13 +408,13 @@ class Screen {
 class ComputerUse {
   ComputerUse._();
 
-  /// Sleep for specified milliseconds
-  static void sleep(int milliseconds) {
-    _bindings.cu_sleep_ms(milliseconds);
+  /// Sleep for specified milliseconds (non-blocking)
+  static Future<void> sleep(int milliseconds) async {
+    await Future.delayed(Duration(milliseconds: milliseconds));
   }
 
-  /// Sleep for specified duration
-  static void sleepDuration(Duration duration) {
-    sleep(duration.inMilliseconds);
+  /// Sleep for specified duration (non-blocking)
+  static Future<void> sleepDuration(Duration duration) async {
+    await Future.delayed(duration);
   }
 }

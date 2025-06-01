@@ -1,118 +1,82 @@
+// Desktop/FFI implementation of the Nutdart API.
+// This file is only included when `dart.library.ffi` is available.  On
+// platforms where the native shared library cannot be loaded (e.g. Android,
+// iOS) the `_bindings` variable will be `null`, and all public methods will
+// silently become no-ops.
+
 import 'dart:ffi';
 import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'package:ffi/ffi.dart' as ffi;
+import 'package:nutdart/src/nutdart_model.dart';
 
 import '../nutdart_bindings_generated.dart';
 
 const String _libName = 'nutdart';
 
-final DynamicLibrary _dylib = () {
-  if (Platform.isMacOS || Platform.isIOS) {
-    return DynamicLibrary.open('$_libName.framework/$_libName');
+// Try to load the dynamic library.  If this fails we return `null` so the rest
+// of the file can gracefully degrade into no-ops.
+DynamicLibrary? _tryOpenDynamicLibrary() {
+  try {
+    if (Platform.isMacOS) {
+      return DynamicLibrary.open('$_libName.framework/$_libName');
+    }
+    if (Platform.isWindows) {
+      return DynamicLibrary.open('$_libName.dll');
+    }
+    if (Platform.isLinux) {
+      return DynamicLibrary.open('lib$_libName.so');
+    }
+    // Mobile or other platforms – not supported.
+    return null;
+  } on Object {
+    // Any error while loading results in a null library.
+    return null;
   }
-  if (Platform.isAndroid || Platform.isLinux) {
-    return DynamicLibrary.open('lib$_libName.so');
-  }
-  if (Platform.isWindows) {
-    return DynamicLibrary.open('$_libName.dll');
-  }
-  throw UnsupportedError('Unknown platform: ${Platform.operatingSystem}');
-}();
+}
 
-final NutdartBindings _bindings = NutdartBindings(_dylib);
+// Load library and bindings lazily and safely
+DynamicLibrary? _dylib;
+NutdartBindings? _bindings;
+bool _initialized = false;
+
+void _tryInit() {
+  if (_initialized) return;
+  _initialized = true;
+  try {
+    _dylib = _tryOpenDynamicLibrary();
+    if (_dylib != null) {
+      _bindings = NutdartBindings(_dylib!);
+    }
+  } on Object {
+    // Any error results in null bindings
+    _dylib = null;
+    _bindings = null;
+  }
+}
+
+bool get _available {
+  _tryInit();
+  return _bindings != null;
+}
 
 // The Nutdart class can be used for any additional functionality
-// For now, it's just a placeholder
+// For now, it's just a placeholder.
 class Nutdart {
-  // Add any additional functionality here if needed
+  const Nutdart();
+  static bool get isAvailable => _available;
 }
 
-/// Represents a point on the screen
-class Point {
-  final int x;
-  final int y;
-
-  const Point(this.x, this.y);
-
-  @override
-  String toString() => 'Point($x, $y)';
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Point &&
-          runtimeType == other.runtimeType &&
-          x == other.x &&
-          y == other.y;
-
-  @override
-  int get hashCode => x.hashCode ^ y.hashCode;
-}
-
-/// Represents screen size
-class Size {
-  final int width;
-  final int height;
-
-  const Size(this.width, this.height);
-
-  @override
-  String toString() => 'Size($width, $height)';
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Size &&
-          runtimeType == other.runtimeType &&
-          width == other.width &&
-          height == other.height;
-
-  @override
-  int get hashCode => width.hashCode ^ height.hashCode;
-}
-
-/// Represents a color
-class Color {
-  final int r;
-  final int g;
-  final int b;
-
-  const Color(this.r, this.g, this.b);
-
-  /// Create color from hex value
-  Color.fromHex(int hex)
-      : r = (hex >> 16) & 0xFF,
-        g = (hex >> 8) & 0xFF,
-        b = hex & 0xFF;
-
-  /// Convert to hex value
-  int get hex => (r << 16) | (g << 8) | b;
-
-  @override
-  String toString() => 'Color($r, $g, $b)';
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Color &&
-          runtimeType == other.runtimeType &&
-          r == other.r &&
-          g == other.g &&
-          b == other.b;
-
-  @override
-  int get hashCode => r.hashCode ^ g.hashCode ^ b.hashCode;
-}
-
-/// Mouse button enumeration
-enum MouseButton {
-  left(CU_MOUSE_LEFT),
-  middle(CU_MOUSE_MIDDLE),
-  right(CU_MOUSE_RIGHT);
-
-  const MouseButton(this.value);
-  final int value;
+// Helper to get the native value for a mouse button
+int _mouseButtonValue(MouseButton button) {
+  switch (button) {
+    case MouseButton.left:
+      return 1; // CU_MOUSE_LEFT
+    case MouseButton.middle:
+      return 2; // CU_MOUSE_MIDDLE  
+    case MouseButton.right:
+      return 3; // CU_MOUSE_RIGHT
+  }
 }
 
 /// Mouse operations
@@ -121,7 +85,8 @@ class Mouse {
 
   /// Move mouse to specified coordinates
   static void moveTo(int x, int y) {
-    _bindings.cu_mouse_move(x, y);
+    _tryInit();
+    _bindings?.cu_mouse_move(x, y);
   }
 
   /// Move mouse to a Point
@@ -131,7 +96,8 @@ class Mouse {
 
   /// Click mouse button at current position
   static void click([MouseButton button = MouseButton.left]) {
-    _bindings.cu_mouse_click(button.value);
+    _tryInit();
+    _bindings?.cu_mouse_click(_mouseButtonValue(button));
   }
 
   /// Click mouse button at specified coordinates
@@ -141,32 +107,32 @@ class Mouse {
   }
 
   /// Click mouse button at a Point
-  static void clickAtPoint(Point point,
-      [MouseButton button = MouseButton.left]) {
+  static void clickAtPoint(Point point, [MouseButton button = MouseButton.left]) {
     clickAt(point.x, point.y, button);
   }
 
   /// Double-click mouse button
   static void doubleClick([MouseButton button = MouseButton.left]) {
-    _bindings.cu_mouse_double_click(button.value);
+    _tryInit();
+    _bindings?.cu_mouse_double_click(_mouseButtonValue(button));
   }
 
   /// Double-click at specified coordinates
-  static void doubleClickAt(int x, int y,
-      [MouseButton button = MouseButton.left]) {
+  static void doubleClickAt(int x, int y, [MouseButton button = MouseButton.left]) {
     moveTo(x, y);
     doubleClick(button);
   }
 
   /// Drag from one point to another
-  static void drag(Point from, Point to,
-      [MouseButton button = MouseButton.left]) {
-    _bindings.cu_mouse_drag(from.x, from.y, to.x, to.y, button.value);
+  static void drag(Point from, Point to, [MouseButton button = MouseButton.left]) {
+    _tryInit();
+    _bindings?.cu_mouse_drag(from.x, from.y, to.x, to.y, _mouseButtonValue(button));
   }
 
   /// Scroll mouse wheel
   static void scroll(int deltaX, int deltaY) {
-    _bindings.cu_mouse_scroll(deltaX, deltaY);
+    _tryInit();
+    _bindings?.cu_mouse_scroll(deltaX, deltaY);
   }
 
   /// Scroll vertically
@@ -181,18 +147,22 @@ class Mouse {
 
   /// Get current mouse position
   static Point getPosition() {
-    final pos = _bindings.cu_mouse_get_position();
+    _tryInit();
+    if (_bindings == null) return const Point(0, 0);
+    final pos = _bindings!.cu_mouse_get_position();
     return Point(pos.x, pos.y);
   }
 
   /// Press and hold mouse button
   static void press([MouseButton button = MouseButton.left]) {
-    _bindings.cu_mouse_toggle(1, button.value);
+    _tryInit();
+    _bindings?.cu_mouse_toggle(1, _mouseButtonValue(button));
   }
 
   /// Release mouse button
   static void release([MouseButton button = MouseButton.left]) {
-    _bindings.cu_mouse_toggle(0, button.value);
+    _tryInit();
+    _bindings?.cu_mouse_toggle(0, _mouseButtonValue(button));
   }
 }
 
@@ -202,9 +172,11 @@ class Keyboard {
 
   /// Tap a key
   static void tap(String key) {
+    _tryInit();
+    if (_bindings == null) return;
     final keyPtr = key.toNativeUtf8();
     try {
-      _bindings.cu_keyboard_key_tap(keyPtr.cast<Char>());
+      _bindings!.cu_keyboard_key_tap(keyPtr.cast<Char>());
     } finally {
       ffi.malloc.free(keyPtr);
     }
@@ -212,11 +184,13 @@ class Keyboard {
 
   /// Tap a key with modifiers
   static void tapWithModifiers(String key, List<String> modifiers) {
+    _tryInit();
+    if (_bindings == null) return;
     final modifierString = modifiers.join(',');
     final keyPtr = key.toNativeUtf8();
     final flagsPtr = modifierString.toNativeUtf8();
     try {
-      _bindings.cu_keyboard_key_tap_with_flags(
+      _bindings!.cu_keyboard_key_tap_with_flags(
           keyPtr.cast<Char>(), flagsPtr.cast<Char>());
     } finally {
       ffi.malloc.free(keyPtr);
@@ -226,9 +200,11 @@ class Keyboard {
 
   /// Type a string
   static void type(String text) {
+    _tryInit();
+    if (_bindings == null) return;
     final textPtr = text.toNativeUtf8();
     try {
-      _bindings.cu_keyboard_type_string(textPtr.cast<Char>());
+      _bindings!.cu_keyboard_type_string(textPtr.cast<Char>());
     } finally {
       ffi.malloc.free(textPtr);
     }
@@ -236,9 +212,11 @@ class Keyboard {
 
   /// Press and hold a key
   static void keyDown(String key) {
+    _tryInit();
+    if (_bindings == null) return;
     final keyPtr = key.toNativeUtf8();
     try {
-      _bindings.cu_keyboard_key_down(keyPtr.cast<Char>());
+      _bindings!.cu_keyboard_key_down(keyPtr.cast<Char>());
     } finally {
       ffi.malloc.free(keyPtr);
     }
@@ -246,17 +224,18 @@ class Keyboard {
 
   /// Release a key
   static void keyUp(String key) {
+    _tryInit();
+    if (_bindings == null) return;
     final keyPtr = key.toNativeUtf8();
     try {
-      _bindings.cu_keyboard_key_up(keyPtr.cast<Char>());
+      _bindings!.cu_keyboard_key_up(keyPtr.cast<Char>());
     } finally {
       ffi.malloc.free(keyPtr);
     }
   }
 
   /// Common key combinations
-  static void copy() =>
-      tapWithModifiers('c', ['cmd']); // or 'ctrl' on Windows/Linux
+  static void copy() => tapWithModifiers('c', ['cmd']);
   static void paste() => tapWithModifiers('v', ['cmd']);
   static void cut() => tapWithModifiers('x', ['cmd']);
   static void selectAll() => tapWithModifiers('a', ['cmd']);
@@ -285,20 +264,16 @@ class Screen {
 
   /// Get screen size
   static Size getSize() {
-    final size = _bindings.cu_screen_get_size();
+    _tryInit();
+    if (_bindings == null) return const Size(0, 0);
+    final size = _bindings!.cu_screen_get_size();
     return Size(size.width, size.height);
   }
 
   /// Capture entire screen
-  ///
-  /// [maxSmallDimension] - Maximum size for the smaller dimension (width or height)
-  /// [maxLargeDimension] - Maximum size for the larger dimension (width or height)
-  /// [quality] - JPEG quality (0-100), defaults to 80
-  static Uint8List? capture({
-    int? maxSmallDimension,
-    int? maxLargeDimension,
-    int quality = 80,
-  }) {
+  static Uint8List? capture({int? maxSmallDimension, int? maxLargeDimension, int quality = 80}) {
+    _tryInit();
+    if (_bindings == null) return null;
     return _captureScreen(
       maxSmallDimension: maxSmallDimension,
       maxLargeDimension: maxLargeDimension,
@@ -307,19 +282,10 @@ class Screen {
   }
 
   /// Capture region of screen
-  ///
-  /// [maxSmallDimension] - Maximum size for the smaller dimension (width or height)
-  /// [maxLargeDimension] - Maximum size for the larger dimension (width or height)
-  /// [quality] - JPEG quality (0-100), defaults to 80
-  static Uint8List? captureRegion(
-    int x,
-    int y,
-    int width,
-    int height, {
-    int? maxSmallDimension,
-    int? maxLargeDimension,
-    int quality = 80,
-  }) {
+  static Uint8List? captureRegion(int x, int y, int width, int height,
+      {int? maxSmallDimension, int? maxLargeDimension, int quality = 80}) {
+    _tryInit();
+    if (_bindings == null) return null;
     return _captureScreen(
       x: x,
       y: y,
@@ -331,15 +297,9 @@ class Screen {
     );
   }
 
-  static Uint8List? _captureScreen({
-    int? x,
-    int? y,
-    int? width,
-    int? height,
-    int? maxSmallDimension,
-    int? maxLargeDimension,
-    int quality = 80,
-  }) {
+  static Uint8List? _captureScreen({int? x, int? y, int? width, int? height, int? maxSmallDimension, int? maxLargeDimension, int quality = 80}) {
+    if (_bindings == null) return null;
+
     // If resize parameters are provided, use the JPEG functions
     if (maxSmallDimension != null || maxLargeDimension != null) {
       final sizePtr = ffi.malloc<Int64>();
@@ -347,7 +307,7 @@ class Screen {
         Pointer<Uint8> jpegPtr;
 
         if (x != null && y != null && width != null && height != null) {
-          jpegPtr = _bindings.cu_screen_capture_region_jpeg(
+          jpegPtr = _bindings!.cu_screen_capture_region_jpeg(
             x,
             y,
             width,
@@ -358,7 +318,7 @@ class Screen {
             sizePtr,
           );
         } else {
-          jpegPtr = _bindings.cu_screen_capture_full_jpeg(
+          jpegPtr = _bindings!.cu_screen_capture_full_jpeg(
             maxSmallDimension ?? -1,
             maxLargeDimension ?? -1,
             quality,
@@ -373,7 +333,7 @@ class Screen {
         final jpegSize = sizePtr.value;
         final data = Uint8List.fromList(jpegPtr.asTypedList(jpegSize));
 
-        _bindings.cu_screen_free_jpeg(jpegPtr);
+        _bindings!.cu_screen_free_jpeg(jpegPtr);
 
         return data;
       } finally {
@@ -385,9 +345,9 @@ class Screen {
     Pointer<CUBitmap> bitmapPtr;
 
     if (x != null && y != null && width != null && height != null) {
-      bitmapPtr = _bindings.cu_screen_capture_region(x, y, width, height);
+      bitmapPtr = _bindings!.cu_screen_capture_region(x, y, width, height);
     } else {
-      bitmapPtr = _bindings.cu_screen_capture_full();
+      bitmapPtr = _bindings!.cu_screen_capture_full();
     }
 
     if (bitmapPtr == nullptr) {
@@ -398,7 +358,7 @@ class Screen {
     final dataSize = bitmap.bytewidth * bitmap.height;
     final data = Uint8List.fromList(bitmap.data.asTypedList(dataSize));
 
-    _bindings.cu_screen_free_capture(bitmapPtr);
+    _bindings!.cu_screen_free_capture(bitmapPtr);
 
     return data;
   }

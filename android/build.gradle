@@ -37,7 +37,14 @@ android {
     // (e.g. ndkVersion "23.1.7779620")
     ndkVersion = android.ndkVersion
 
-    // Invoke the shared CMake build with the Android Gradle Plugin.
+    // On Android we ship a pure Dart stub implementation that performs no
+    // native interop, therefore no C/C++ sources need to be built.  We keep
+    // the following `externalNativeBuild` configuration commented-out so that
+    // developers can re-enable it locally if they want to experiment with a
+    // native Android port. Skipping this step avoids CMake errors on CI and
+    // during normal application builds.
+
+    /*
     externalNativeBuild {
         cmake {
             path = "../src/CMakeLists.txt"
@@ -51,6 +58,7 @@ android {
             // version "3.10.2"
         }
     }
+    */
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

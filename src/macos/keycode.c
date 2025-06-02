@@ -2,6 +2,7 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <Carbon/Carbon.h> /* For kVK_ constants, and TIS functions. */
+#include <dispatch/dispatch.h> /* For GCD main queue dispatch */
 
 /* Returns string representation of key, if it is printable.
  * Ownership follows the Create Rule; that is, it is the caller's
@@ -55,28 +56,51 @@ MMKeyCode keyCodeForChar(const char c)
 
 CFStringRef createStringForKey(CGKeyCode keyCode)
 {
-	TISInputSourceRef currentKeyboard = TISCopyCurrentASCIICapableKeyboardInputSource();
-	CFDataRef layoutData =
-		TISGetInputSourceProperty(currentKeyboard,
-								  kTISPropertyUnicodeKeyLayoutData);
-	const UCKeyboardLayout *keyboardLayout =
-		(const UCKeyboardLayout *)CFDataGetBytePtr(layoutData);
+ __block CFStringRef result = NULL;
+ 
+ // HIToolbox functions must be called on the main thread
+ dispatch_sync(dispatch_get_main_queue(), ^{
+  TISInputSourceRef currentKeyboard = TISCopyCurrentASCIICapableKeyboardInputSource();
+  if (currentKeyboard == NULL) {
+   return;
+  }
+  
+  CFDataRef layoutData =
+   TISGetInputSourceProperty(currentKeyboard,
+           kTISPropertyUnicodeKeyLayoutData);
+  if (layoutData == NULL) {
+   CFRelease(currentKeyboard);
+   return;
+  }
+  
+  const UCKeyboardLayout *keyboardLayout =
+   (const UCKeyboardLayout *)CFDataGetBytePtr(layoutData);
+  if (keyboardLayout == NULL) {
+   CFRelease(currentKeyboard);
+   return;
+  }
 
-	UInt32 keysDown = 0;
-	UniChar chars[4];
-	UniCharCount realLength;
+  UInt32 keysDown = 0;
+  UniChar chars[4];
+  UniCharCount realLength;
 
-	UCKeyTranslate(keyboardLayout,
-				   keyCode,
-				   kUCKeyActionDisplay,
-				   0,
-				   LMGetKbdType(),
-				   kUCKeyTranslateNoDeadKeysBit,
-				   &keysDown,
-				   sizeof(chars) / sizeof(chars[0]),
-				   &realLength,
-				   chars);
-	CFRelease(currentKeyboard);
+  OSStatus status = UCKeyTranslate(keyboardLayout,
+           keyCode,
+           kUCKeyActionDisplay,
+           0,
+           LMGetKbdType(),
+           kUCKeyTranslateNoDeadKeysBit,
+           &keysDown,
+           sizeof(chars) / sizeof(chars[0]),
+           &realLength,
+           chars);
+  
+  CFRelease(currentKeyboard);
+  
+  if (status == noErr && realLength > 0) {
+   result = CFStringCreateWithCharacters(kCFAllocatorDefault, chars, realLength);
+  }
+ });
 
-	return CFStringCreateWithCharacters(kCFAllocatorDefault, chars, 1);
+ return result;
 }

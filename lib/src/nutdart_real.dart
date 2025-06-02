@@ -73,7 +73,7 @@ int _mouseButtonValue(MouseButton button) {
     case MouseButton.left:
       return 1; // CU_MOUSE_LEFT
     case MouseButton.middle:
-      return 2; // CU_MOUSE_MIDDLE  
+      return 2; // CU_MOUSE_MIDDLE
     case MouseButton.right:
       return 3; // CU_MOUSE_RIGHT
   }
@@ -107,7 +107,10 @@ class Mouse {
   }
 
   /// Click mouse button at a Point
-  static void clickAtPoint(Point point, [MouseButton button = MouseButton.left]) {
+  static void clickAtPoint(
+    Point point, [
+    MouseButton button = MouseButton.left,
+  ]) {
     clickAt(point.x, point.y, button);
   }
 
@@ -118,15 +121,29 @@ class Mouse {
   }
 
   /// Double-click at specified coordinates
-  static void doubleClickAt(int x, int y, [MouseButton button = MouseButton.left]) {
+  static void doubleClickAt(
+    int x,
+    int y, [
+    MouseButton button = MouseButton.left,
+  ]) {
     moveTo(x, y);
     doubleClick(button);
   }
 
   /// Drag from one point to another
-  static void drag(Point from, Point to, [MouseButton button = MouseButton.left]) {
+  static void drag(
+    Point from,
+    Point to, [
+    MouseButton button = MouseButton.left,
+  ]) {
     _tryInit();
-    _bindings?.cu_mouse_drag(from.x, from.y, to.x, to.y, _mouseButtonValue(button));
+    _bindings?.cu_mouse_drag(
+      from.x,
+      from.y,
+      to.x,
+      to.y,
+      _mouseButtonValue(button),
+    );
   }
 
   /// Scroll mouse wheel
@@ -183,15 +200,53 @@ class Keyboard {
   }
 
   /// Tap a key with modifiers
+  ///
+  /// Valid modifiers: "cmd", "alt", "control", "shift", "meta", "fn"
+  /// The C library expects comma-separated modifiers and handles main thread dispatch internally.
   static void tapWithModifiers(String key, List<String> modifiers) {
     _tryInit();
-    if (_bindings == null) return;
+    if (_bindings == null) {
+      throw StateError('Nutdart bindings not available');
+    }
+
+    if (key.isEmpty) {
+      throw ArgumentError('Key cannot be empty');
+    }
+
+    // If no modifiers, just use regular tap
+    if (modifiers.isEmpty) {
+      tap(key);
+      return;
+    }
+
+    // Validate modifiers
+    const validModifiers = {
+      'cmd',
+      'alt',
+      'control',
+      'shift',
+      'meta',
+      'fn',
+      'win',
+    };
+    for (final modifier in modifiers) {
+      if (!validModifiers.contains(modifier.toLowerCase())) {
+        throw ArgumentError(
+          'Invalid modifier: $modifier. Valid modifiers: ${validModifiers.join(", ")}',
+        );
+      }
+    }
+
+    // The C library parseKeyFlags function expects comma-separated modifiers
     final modifierString = modifiers.join(',');
+
     final keyPtr = key.toNativeUtf8();
     final flagsPtr = modifierString.toNativeUtf8();
     try {
       _bindings!.cu_keyboard_key_tap_with_flags(
-          keyPtr.cast<Char>(), flagsPtr.cast<Char>());
+        keyPtr.cast<Char>(),
+        flagsPtr.cast<Char>(),
+      );
     } finally {
       ffi.malloc.free(keyPtr);
       ffi.malloc.free(flagsPtr);
@@ -271,7 +326,11 @@ class Screen {
   }
 
   /// Capture entire screen
-  static Uint8List? capture({int? maxSmallDimension, int? maxLargeDimension, int quality = 80}) {
+  static Uint8List? capture({
+    int? maxSmallDimension,
+    int? maxLargeDimension,
+    int quality = 80,
+  }) {
     _tryInit();
     if (_bindings == null) return null;
     return _captureScreen(
@@ -282,8 +341,15 @@ class Screen {
   }
 
   /// Capture region of screen
-  static Uint8List? captureRegion(int x, int y, int width, int height,
-      {int? maxSmallDimension, int? maxLargeDimension, int quality = 80}) {
+  static Uint8List? captureRegion(
+    int x,
+    int y,
+    int width,
+    int height, {
+    int? maxSmallDimension,
+    int? maxLargeDimension,
+    int quality = 80,
+  }) {
     _tryInit();
     if (_bindings == null) return null;
     return _captureScreen(
@@ -297,7 +363,15 @@ class Screen {
     );
   }
 
-  static Uint8List? _captureScreen({int? x, int? y, int? width, int? height, int? maxSmallDimension, int? maxLargeDimension, int quality = 80}) {
+  static Uint8List? _captureScreen({
+    int? x,
+    int? y,
+    int? width,
+    int? height,
+    int? maxSmallDimension,
+    int? maxLargeDimension,
+    int quality = 80,
+  }) {
     if (_bindings == null) return null;
 
     // If resize parameters are provided, use the JPEG functions

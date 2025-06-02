@@ -145,7 +145,124 @@ class _MyAppState extends State<MyApp> {
                   child: Text(isCapturing ? 'Capturing...' : 'Take Screenshot'),
                 ),
                 const SizedBox(height: 20),
-                if (screenshotData != null) ...[                  
+                Builder(
+                  builder: (context) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        // First test: make sure regular tap works
+                        try {
+                          Keyboard.tap('a');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Regular tap("a") worked'),
+                            ),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Regular tap failed: $e')),
+                          );
+                        }
+                      },
+                      child: const Text('Test Regular Tap'),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                Builder(
+                  builder: (context) {
+                    return ElevatedButton(
+                      onPressed: () async {
+                        // Test tapWithModifiers with empty modifiers (should fall back to regular tap)
+                        try {
+                          Keyboard.tapWithModifiers('b', []);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'tapWithModifiers with empty modifiers worked',
+                              ),
+                            ),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'tapWithModifiers with empty modifiers failed: $e',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Test Empty Modifiers'),
+                    );
+                  }
+                ),
+                const SizedBox(height: 10),
+                Builder(
+                  builder: (context) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        // Test single modifier
+                        try {
+                          Keyboard.tapWithModifiers('c', ['cmd']);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Sent Cmd+C (Copy)')),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error with Cmd+C: $e')),
+                          );
+                        }
+                      },
+                      child: const Text('Test Cmd+C'),
+                    );
+                  }
+                ),
+                const SizedBox(height: 10),
+                Builder(
+                  builder: (context) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        // Test two modifiers
+                        try {
+                          Keyboard.tapWithModifiers('a', ['cmd', 'shift']);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Sent Cmd+Shift+A')),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error with Cmd+Shift+A: $e')),
+                          );
+                        }
+                      },
+                      child: const Text('Test Cmd+Shift+A'),
+                    );
+                  }
+                ),
+                const SizedBox(height: 10),
+                Builder(
+                  builder: (context) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        // Test using the convenience copy() method
+                        try {
+                          Keyboard.copy();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Called Keyboard.copy() successfully'),
+                            ),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error with copy(): $e')),
+                          );
+                        }
+                      },
+                      child: const Text('Test copy() method'),
+                    );
+                  }
+                ),
+                const SizedBox(height: 20),
+                if (screenshotData != null) ...[
                   const Text(
                     'Screenshot:',
                     style: textStyle,

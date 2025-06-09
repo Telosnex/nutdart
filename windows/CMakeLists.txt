@@ -29,6 +29,9 @@ add_library(${PLUGIN_NAME} SHARED
   "nutdart_plugin.h"
 )
 
+# Ensure the nutdart library is built before the plugin
+add_dependencies(${PLUGIN_NAME} nutdart)
+
 # Apply a standard set of build settings that are configured in the
 # application-level CMakeLists.txt. This can be removed for plugins that want
 # full control over build settings.
@@ -50,6 +53,12 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 # Link the nutdart library
 target_link_libraries(${PLUGIN_NAME} PRIVATE nutdart)
 
+# Windows-specific library path configuration
+if(WIN32)
+    # Add the shared build directory to the library search path
+    target_link_directories(${PLUGIN_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/shared")
+endif()
+
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an
 # external build triggered from this build file.
@@ -58,3 +67,10 @@ set(nutdart_bundled_libraries
   $<TARGET_FILE:nutdart>
   PARENT_SCOPE
 )
+
+# Debug information for troubleshooting
+if(WIN32)
+    message(STATUS "PLUGIN_NAME: ${PLUGIN_NAME}")
+    message(STATUS "CMAKE_CURRENT_BINARY_DIR: ${CMAKE_CURRENT_BINARY_DIR}")
+    message(STATUS "nutdart target file: $<TARGET_FILE:nutdart>")
+endif()

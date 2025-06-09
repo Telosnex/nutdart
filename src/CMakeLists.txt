@@ -97,6 +97,16 @@ set_target_properties(nutdart PROPERTIES
     OUTPUT_NAME "nutdart"
 )
 
+# Windows-specific configuration for proper import library generation
+if(WIN32)
+    set_target_properties(nutdart PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    )
+endif()
+
 if (ANDROID)
   # Support Android 15 16k page size
   target_link_options(nutdart PRIVATE "-Wl,-z,max-page-size=16384")

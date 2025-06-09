@@ -161,6 +161,14 @@ static uint8_t* convertBitmapToJpeg(MMBitmapRef bitmap, int32_t quality,
         if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
+
+    // Create JPEG encoder
+    hr = IWICImagingFactory_CreateEncoder(factory, &GUID_ContainerFormatJpeg, NULL, &encoder);
+    if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
+        goto cleanup;
+    }
+
     // Initialize encoder with stream
     hr = IWICBitmapEncoder_Initialize(encoder, (IStream*)stream, WICBitmapEncoderNoCache);
     if (FAILED(hr)) {

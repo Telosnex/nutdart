@@ -309,7 +309,6 @@ uint8_t* copyBitmapRegionJpeg_WIN32(int64_t x, int64_t y, int64_t width, int64_t
 uint8_t* copyBitmapFullJpeg_WIN32(int32_t maxSmallDim, int32_t maxLargeDim, 
                                   int32_t quality, int64_t* outSize) {
     if (outSize) *outSize = 0;
-         MessageBoxA(NULL, "copyBitmapFullJpeg_WIN32 CALLED!", "NUTDART", MB_OK); 
 
     // Get screen size
     MMSize screenSize = getMainDisplaySize();

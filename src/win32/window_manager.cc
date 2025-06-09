@@ -43,10 +43,16 @@ std::string getWindowTitle(const WindowHandle windowHandle) {
     if (IsWindow(hWnd)) {
         auto BUFFER_SIZE = GetWindowTextLength(hWnd) + 1;
         if (BUFFER_SIZE) {
-            auto windowTitle = new CHAR[BUFFER_SIZE];
+            auto windowTitle = new WCHAR[BUFFER_SIZE];
             if (GetWindowText(hWnd, windowTitle, BUFFER_SIZE)) {
-                return {windowTitle};
+                // Convert wide string to narrow string
+                int size_needed = WideCharToMultiByte(CP_UTF8, 0, windowTitle, -1, NULL, 0, NULL, NULL);
+                std::string result(size_needed - 1, 0);
+                WideCharToMultiByte(CP_UTF8, 0, windowTitle, -1, &result[0], size_needed, NULL, NULL);
+                delete[] windowTitle;
+                return result;
             }
+            delete[] windowTitle;
         }
     }
     return "";

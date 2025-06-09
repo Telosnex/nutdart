@@ -94,7 +94,6 @@ target_compile_definitions(nutdart PUBLIC DART_SHARED_LIB)
 
 # Output configuration
 set_target_properties(nutdart PROPERTIES
-    PUBLIC_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/nutdart.h"
     OUTPUT_NAME "nutdart"
 )
 

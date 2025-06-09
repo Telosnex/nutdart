@@ -29,10 +29,11 @@ if(WIN32)
         win32/mouse.c
         win32/screen.c
         win32/screengrab.c
+        win32/screengrab_jpeg.c
         win32/highlightwindow.c
         win32/window_manager.cc
     )
-    set(PLATFORM_LIBS user32 gdi32)
+    set(PLATFORM_LIBS user32 gdi32 ole32 windowscodecs)
 elseif(APPLE)
     set(PLATFORM_SOURCES
         macos/keycode.c

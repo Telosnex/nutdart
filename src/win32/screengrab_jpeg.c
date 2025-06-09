@@ -7,6 +7,11 @@
 #include <propvarutil.h>
 #include <stdlib.h>
 #include <math.h>
+#include <windows.h>
+#include <wincodec.h>
+#include <ole2.h>
+#include <objbase.h>
+#include <initguid.h>  // Important for GUID definitions
 
 // Define GUIDs if not available
 #ifndef GUID_WICPixelFormat32bppBGRA
@@ -138,45 +143,38 @@ static uint8_t* convertBitmapToJpeg(MMBitmapRef bitmap, int32_t quality,
         bitmapSource = (IWICBitmapSource*)scaler;
     }
     
-    // Create memory stream - we'll use a temporary file approach for simplicity
-    // as WIC memory streams have some complexities with dynamic sizing
-    WCHAR tempPath[MAX_PATH];
-    WCHAR tempFile[MAX_PATH];
-    tempFile[0] = 0;  // Initialize to empty string
-    
-    if (GetTempPathW(MAX_PATH, tempPath) == 0 ||
-        GetTempFileNameW(tempPath, L"jpg", 0, tempFile) == 0) {
+    // Create memory stream for in-memory JPEG encoding
+    IStream* memoryStream = NULL;
+    hr = CreateStreamOnHGlobal(NULL, TRUE, &memoryStream);
+    if (FAILED(hr)) {
         goto cleanup;
     }
-    
+
     hr = IWICImagingFactory_CreateStream(factory, &stream);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
-    hr = IWICStream_InitializeFromFilename(stream, tempFile, GENERIC_WRITE);
+
+    hr = IWICStream_InitializeFromIStream(stream, memoryStream);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
-    // Create JPEG encoder
-    hr = IWICImagingFactory_CreateEncoder(factory, &GUID_ContainerFormatJpeg, NULL, &encoder);
-    if (FAILED(hr)) {
-        goto cleanup;
-    }
-    
     // Initialize encoder with stream
     hr = IWICBitmapEncoder_Initialize(encoder, (IStream*)stream, WICBitmapEncoderNoCache);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
+
     // Create frame encoder
     hr = IWICBitmapEncoder_CreateNewFrame(encoder, &frameEncode, &propertyBag);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
+
     // Set JPEG quality (clamp to valid range)
     if (propertyBag) {
         int clampedQuality = quality;
@@ -193,82 +191,81 @@ static uint8_t* convertBitmapToJpeg(MMBitmapRef bitmap, int32_t quality,
         IPropertyBag2_Write(propertyBag, 1, &option, &varValue);
         VariantClear(&varValue);
     }
-    
     // Initialize frame encoder
     hr = IWICBitmapFrameEncode_Initialize(frameEncode, propertyBag);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
+
     // Set frame size
     hr = IWICBitmapFrameEncode_SetSize(frameEncode, (UINT)resizeWidth, (UINT)resizeHeight);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
+
     // Set pixel format (let WIC convert if needed)
     WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat24bppBGR;
     hr = IWICBitmapFrameEncode_SetPixelFormat(frameEncode, &pixelFormat);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
+
     // Write bitmap source to frame
     hr = IWICBitmapFrameEncode_WriteSource(frameEncode, bitmapSource, NULL);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
+
     // Commit frame and encoder
     hr = IWICBitmapFrameEncode_Commit(frameEncode);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
+
     hr = IWICBitmapEncoder_Commit(encoder);
     if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
-    // Close the stream to flush data to file
-    if (stream) {
-        IWICStream_Release(stream);
-        stream = NULL;
-    }
-    
-    // Now read the file back into memory
-    HANDLE hFile = CreateFileW(tempFile, GENERIC_READ, FILE_SHARE_READ, NULL, 
-                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile == INVALID_HANDLE_VALUE) {
+
+    // Get the data from memory stream
+    HGLOBAL hGlobal = NULL;
+    hr = GetHGlobalFromStream(memoryStream, &hGlobal);
+    if (FAILED(hr)) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
-    LARGE_INTEGER fileSize;
-    if (!GetFileSizeEx(hFile, &fileSize)) {
-        CloseHandle(hFile);
+
+    SIZE_T dataSize = GlobalSize(hGlobal);
+    void* data = GlobalLock(hGlobal);
+    if (!data) {
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
-    *outSize = fileSize.QuadPart;
-    result = (uint8_t*)malloc((size_t)*outSize);
+
+    // Copy data to our result buffer
+    *outSize = (int64_t)dataSize;
+    result = (uint8_t*)malloc(dataSize);
     if (!result) {
         *outSize = 0;
-        CloseHandle(hFile);
+        GlobalUnlock(hGlobal);
+        if (memoryStream) IStream_Release(memoryStream);
         goto cleanup;
     }
-    
-    DWORD bytesRead;
-    if (!ReadFile(hFile, result, (DWORD)*outSize, &bytesRead, NULL) || 
-        bytesRead != *outSize) {
-        free(result);
-        result = NULL;
-        *outSize = 0;
-        CloseHandle(hFile);
-        goto cleanup;
+
+    memcpy(result, data, dataSize);
+    GlobalUnlock(hGlobal);
+
+    // Release memory stream
+    if (memoryStream) {
+        IStream_Release(memoryStream);
+        memoryStream = NULL;
     }
-    
-    CloseHandle(hFile);
-    DeleteFileW(tempFile);  // Clean up temp file
     
 cleanup:
     if (propertyBag) IPropertyBag2_Release(propertyBag);
@@ -278,11 +275,7 @@ cleanup:
     if (scaler) IWICBitmapScaler_Release(scaler);
     if (wicBitmap) IWICBitmap_Release(wicBitmap);
     if (factory) IWICImagingFactory_Release(factory);
-    
-    // Clean up temp file if it exists (in case of error)
-    if (tempFile[0] != 0) {
-        DeleteFileW(tempFile);
-    }
+
     
     return result;
 }
@@ -292,7 +285,6 @@ uint8_t* copyBitmapRegionJpeg_WIN32(int64_t x, int64_t y, int64_t width, int64_t
                                     int32_t maxSmallDim, int32_t maxLargeDim, 
                                     int32_t quality, int64_t* outSize) {
     if (outSize) *outSize = 0;
-    
     // Capture the region as bitmap first
     MMBitmapRef bitmap = copyMMBitmapFromDisplayInRect(MMRectMake(x, y, width, height));
     if (!bitmap) {
@@ -317,7 +309,8 @@ uint8_t* copyBitmapRegionJpeg_WIN32(int64_t x, int64_t y, int64_t width, int64_t
 uint8_t* copyBitmapFullJpeg_WIN32(int32_t maxSmallDim, int32_t maxLargeDim, 
                                   int32_t quality, int64_t* outSize) {
     if (outSize) *outSize = 0;
-    
+         MessageBoxA(NULL, "copyBitmapFullJpeg_WIN32 CALLED!", "NUTDART", MB_OK); 
+
     // Get screen size
     MMSize screenSize = getMainDisplaySize();
     

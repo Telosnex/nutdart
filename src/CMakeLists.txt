@@ -33,7 +33,7 @@ if(WIN32)
         win32/highlightwindow.c
         win32/window_manager.cc
     )
-    set(PLATFORM_LIBS user32 gdi32 ole32 windowscodecs)
+    set(PLATFORM_LIBS user32 gdi32 ole32 oleaut32 windowscodecs uuid)
 elseif(APPLE)
     set(PLATFORM_SOURCES
         macos/keycode.c
@@ -106,6 +106,8 @@ if(WIN32)
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     )
+    # Add COM definitions for WIC support
+    target_compile_definitions(nutdart PRIVATE COBJMACROS CINTERFACE)
 endif()
 
 if (ANDROID)

@@ -33,7 +33,7 @@ if(WIN32)
         win32/highlightwindow.c
         win32/window_manager.cc
     )
-    set(PLATFORM_LIBS user32 gdi32 ole32 oleaut32 windowscodecs uuid)
+    set(PLATFORM_LIBS user32 gdi32 ole32 windowscodecs)
 elseif(APPLE)
     set(PLATFORM_SOURCES
         macos/keycode.c
@@ -71,6 +71,7 @@ elseif(UNIX)
         linux/mouse.c
         linux/screen.c
         linux/screengrab.c
+        linux/screengrab_jpeg.c
         linux/window_manager.cc
         linux/xdisplay.c
     )
@@ -78,8 +79,9 @@ elseif(UNIX)
     pkg_check_modules(X11 REQUIRED x11)
     pkg_check_modules(XTST REQUIRED xtst)
     pkg_check_modules(XINERAMA REQUIRED xinerama)
-    set(PLATFORM_LIBS ${X11_LIBRARIES} ${XTST_LIBRARIES} ${XINERAMA_LIBRARIES})
-    include_directories(${X11_INCLUDE_DIRS} ${XTST_INCLUDE_DIRS} ${XINERAMA_INCLUDE_DIRS})
+    pkg_check_modules(JPEG REQUIRED libjpeg)
+    set(PLATFORM_LIBS ${X11_LIBRARIES} ${XTST_LIBRARIES} ${XINERAMA_LIBRARIES} ${JPEG_LIBRARIES})
+    include_directories(${X11_INCLUDE_DIRS} ${XTST_INCLUDE_DIRS} ${XINERAMA_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS})
 endif()
 
 # Create the shared library

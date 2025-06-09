@@ -296,7 +296,7 @@ CUBitmap* cu_screen_capture_full(void) {
     return cu_screen_capture_region(0, 0, size.width, size.height);
 }
 
-// Forward declarations for Windows JPEG functions
+// Forward declarations for platform-specific JPEG functions
 #ifdef _WIN32
 uint8_t* copyBitmapRegionJpeg_WIN32(int64_t x, int64_t y, int64_t width, int64_t height, 
                                     int32_t maxSmallDim, int32_t maxLargeDim, 
@@ -304,6 +304,15 @@ uint8_t* copyBitmapRegionJpeg_WIN32(int64_t x, int64_t y, int64_t width, int64_t
 uint8_t* copyBitmapFullJpeg_WIN32(int32_t maxSmallDim, int32_t maxLargeDim, 
                                   int32_t quality, int64_t* outSize);
 void freeJpegData_WIN32(uint8_t* data);
+#endif
+
+#ifdef __linux__
+uint8_t* copyBitmapRegionJpeg_LINUX(int64_t x, int64_t y, int64_t width, int64_t height, 
+                                    int32_t maxSmallDim, int32_t maxLargeDim, 
+                                    int32_t quality, int64_t* outSize);
+uint8_t* copyBitmapFullJpeg_LINUX(int32_t maxSmallDim, int32_t maxLargeDim, 
+                                  int32_t quality, int64_t* outSize);
+void freeJpegData_LINUX(uint8_t* data);
 #endif
 
 // JPEG screenshot functions with resizing
@@ -319,6 +328,10 @@ uint8_t* cu_screen_capture_region_jpeg(int64_t x, int64_t y, int64_t width, int6
 #ifdef _WIN32
     // Use Windows implementation
     return copyBitmapRegionJpeg_WIN32(x, y, width, height, maxSmallDim, maxLargeDim, quality, outSize);
+#endif
+#ifdef __linux__
+    // Use Linux implementation
+    return copyBitmapRegionJpeg_LINUX(x, y, width, height, maxSmallDim, maxLargeDim, quality, outSize);
 #endif
     // Fallback: not implemented for other platforms yet
     if (outSize) *outSize = 0;
@@ -337,6 +350,10 @@ uint8_t* cu_screen_capture_full_jpeg(int32_t maxSmallDim, int32_t maxLargeDim,
     // Use Windows implementation
     return copyBitmapFullJpeg_WIN32(maxSmallDim, maxLargeDim, quality, outSize);
 #endif
+#ifdef __linux__
+    // Use Linux implementation
+    return copyBitmapFullJpeg_LINUX(maxSmallDim, maxLargeDim, quality, outSize);
+#endif
     // Fallback: not implemented for other platforms yet
     if (outSize) *outSize = 0;
     return NULL;
@@ -351,6 +368,10 @@ void cu_screen_free_jpeg(uint8_t* data) {
 #endif
 #ifdef _WIN32
     freeJpegData_WIN32(data);
+    return;
+#endif
+#ifdef __linux__
+    freeJpegData_LINUX(data);
     return;
 #endif
     // Fallback

@@ -14,7 +14,6 @@ MMKeyCode keyCodeForChar(const char c)
 	/* OS X does not appear to have a built-in function for this, so instead we
 	 * have to write our own. */
 	static CFMutableDictionaryRef charToCodeDict = NULL;
-	CGKeyCode code;
 	UniChar character = c;
 	CFStringRef charStr = NULL;
 
@@ -35,7 +34,7 @@ MMKeyCode keyCodeForChar(const char c)
 			CFStringRef string = createStringForKey((CGKeyCode)i);
 			if (string != NULL)
 			{
-				CFDictionaryAddValue(charToCodeDict, string, (const void *)i);
+				CFDictionaryAddValue(charToCodeDict, string, (const void *)(uintptr_t)i);
 				CFRelease(string);
 			}
 		}
@@ -43,11 +42,18 @@ MMKeyCode keyCodeForChar(const char c)
 
 	charStr = CFStringCreateWithCharacters(kCFAllocatorDefault, &character, 1);
 
-	/* Our values may be NULL (0), so we need to use this function. */
+	/* Our values may be NULL (0), so we need to use this function.
+	 * Use pointer-sized intermediate variable to avoid memory width issues. */
+	void *value = NULL;
+	CGKeyCode code;
 	if (!CFDictionaryGetValueIfPresent(charToCodeDict, charStr,
-									   (const void **)&code))
+									   (const void **)&value))
 	{
 		code = UINT16_MAX; /* Error */
+	}
+	else
+	{
+		code = (CGKeyCode)(uintptr_t)value;
 	}
 
 	CFRelease(charStr);

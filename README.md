@@ -200,7 +200,7 @@ This plugin is designed exclusively for **desktop platforms**:
 
 The plugin automatically builds native libraries for each platform:
 
-- **macOS/iOS**: Uses Xcode and CocoaPods
+- **macOS/iOS**: Uses Xcode and Swift Package Manager (iOS is a stub)
 - **Windows**: Uses CMake and MSVC
 - **Linux**: Uses CMake and GCC
 - **Android**: Uses Gradle and NDK (stub only)

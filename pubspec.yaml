@@ -8,6 +8,7 @@ environment:
   flutter: '>=3.3.0'
 
 dependencies:
+  dbus: ^0.8.0
   ffi: ^2.1.4
   flutter:
     sdk: flutter

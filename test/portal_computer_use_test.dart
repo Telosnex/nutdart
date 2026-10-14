@@ -1,0 +1,377 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:dbus/dbus.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:nutdart/nutdart_portal.dart';
+import 'package:nutdart/src/nutdart_model.dart';
+import 'package:nutdart/src/portal/portal_transport.dart';
+import 'package:nutdart/src/portal/pipewire_frames.dart';
+
+class FakeTransport implements PortalTransport {
+  final requests = <String>[];
+  final inputs = <(String, List<DBusValue>)>[];
+  final events = StreamController<void>.broadcast(sync: true);
+  int devices = 3;
+  String? failAt;
+  String? uri;
+  int sessionsClosed = 0;
+  int clientsClosed = 0;
+  @override
+  Future<Map<String, DBusValue>> request(
+    String interface,
+    String method,
+    List<DBusValue> arguments,
+    Map<String, DBusValue> options,
+  ) async {
+    requests.add('$interface.$method');
+    if (method == failAt) throw PortalResponseException(method, 1);
+    return switch (method) {
+      'Screenshot' => {'uri': DBusString(uri!)},
+      'CreateSession' => {'session_handle': const DBusString('/session/test')},
+      'Start' => {
+        'devices': DBusUint32(devices),
+        'streams': DBusArray(DBusSignature('(ua{sv})'), [
+          DBusStruct([
+            const DBusUint32(73),
+            DBusDict.stringVariant({
+              'size': DBusStruct([const DBusInt32(1024), const DBusInt32(768)]),
+            }),
+          ]),
+        ]),
+      },
+      _ => {},
+    };
+  }
+
+  @override
+  Future<int> openPipeWire(String session) async => -1;
+
+  @override
+  Future<void> notify(String method, List<DBusValue> arguments) async {
+    inputs.add((method, arguments));
+  }
+
+  @override
+  Stream<void> closed(String session) => events.stream;
+  @override
+  Future<void> closeSession(String session) async {
+    sessionsClosed++;
+  }
+
+  @override
+  Future<void> close() async {
+    clientsClosed++;
+    await events.close();
+  }
+}
+
+Uint8List pngHeader(int width, int height) {
+  final bytes = Uint8List(33);
+  bytes.setRange(0, 8, [137, 80, 78, 71, 13, 10, 26, 10]);
+  final data = ByteData.sublistView(bytes);
+  data.setUint32(8, 13);
+  data.setUint32(12, 0x49484452);
+  data.setUint32(16, width);
+  data.setUint32(20, height);
+  return bytes;
+}
+
+class FakeFrames implements PortalFrameSource {
+  int closed = 0;
+  Completer<Uint8List>? pending;
+  bool? requestedFresh;
+  bool stale = false;
+  @override
+  Future<CapturedPixels> capture({bool fresh = false}) async {
+    requestedFresh = fresh;
+    return CapturedPixels(
+      pending == null ? pngHeader(2048, 1536) : await pending!.future,
+      runningTimeNs: stale ? 99 : 101,
+      boundaryNs: fresh ? 100 : null,
+    );
+  }
+
+  @override
+  Future<void> close() async {
+    closed++;
+  }
+}
+
+void main() {
+  late FakeTransport transport;
+  late PortalComputerUse portal;
+  setUp(() {
+    transport = FakeTransport();
+    portal = PortalComputerUse.withTransport(transport);
+  });
+  tearDown(() async {
+    await portal.close();
+  });
+
+  test('fresh captures enforce and expose the timestamp boundary', () async {
+    final frames = FakeFrames();
+    portal = PortalComputerUse.withTransport(
+      transport,
+      openFrames: (_, _) async => frames,
+    );
+    await portal.start();
+    final frame = await portal.captureFrame(fresh: true);
+    expect(frames.requestedFresh, isTrue);
+    expect(frame.runningTimeNs, greaterThan(frame.boundaryNs!));
+    frames.stale = true;
+    await expectLater(portal.captureFrame(fresh: true), throwsStateError);
+    expect(frames.closed, 1);
+  });
+
+  test('concurrent close waits for pending frame and cleanup', () async {
+    final frames = FakeFrames()..pending = Completer<Uint8List>();
+    portal = PortalComputerUse.withTransport(
+      transport,
+      openFrames: (_, _) async => frames,
+    );
+    await portal.start();
+    final capture = portal.captureFrame();
+    final assertion = expectLater(capture, throwsStateError);
+    await Future<void>.delayed(Duration.zero);
+    final first = portal.close(), second = portal.close();
+    expect(identical(first, second), isTrue);
+    frames.pending!.complete(pngHeader(2048, 1536));
+    await assertion;
+    await first;
+    await second;
+    expect(frames.closed, 1);
+    expect(transport.clientsClosed, 1);
+  });
+
+  test('close during stream opening closes the eventual source', () async {
+    final opening = Completer<PortalFrameSource>();
+    final frames = FakeFrames();
+    portal = PortalComputerUse.withTransport(
+      transport,
+      openFrames: (_, _) => opening.future,
+    );
+    await portal.start();
+    final capture = portal.captureFrame();
+    final assertion = expectLater(capture, throwsStateError);
+    await Future<void>.delayed(Duration.zero);
+    final closing = portal.close();
+    opening.complete(frames);
+    await assertion;
+    await closing;
+    expect(frames.closed, 1);
+  });
+
+  test('stream is lazy, reused, and closed with client', () async {
+    final frames = FakeFrames();
+    var opened = 0;
+    portal = PortalComputerUse.withTransport(
+      transport,
+      openFrames: (fd, node) async {
+        expect(node, 73);
+        opened++;
+        return frames;
+      },
+    );
+    await portal.start();
+    expect(opened, 0);
+    final frame = await portal.captureFrame();
+    await portal.captureFrame();
+    expect(opened, 1);
+    expect(frame.pixelSize, const Size(2048, 1536));
+    await portal.moveToFrame(frame, 1024, 768);
+    expect(transport.inputs.single.$2.sublist(2), [
+      const DBusUint32(73),
+      const DBusDouble(512),
+      const DBusDouble(384),
+    ]);
+    await portal.close();
+    expect(frames.closed, 1);
+  });
+
+  test('revocation during capture discards the frame', () async {
+    final frames = FakeFrames()..pending = Completer<Uint8List>();
+    portal = PortalComputerUse.withTransport(
+      transport,
+      openFrames: (_, _) async => frames,
+    );
+    await portal.start();
+    final capturing = portal.captureFrame();
+    final assertion = expectLater(capturing, throwsStateError);
+    await Future<void>.delayed(Duration.zero);
+    transport.events.add(null);
+    frames.pending!.complete(pngHeader(2048, 1536));
+    await assertion;
+    await portal.close(); // Includes cleanup already started by revocation.
+    expect(frames.closed, 1);
+  });
+
+  test('frame cannot control a later session', () async {
+    portal = PortalComputerUse.withTransport(
+      transport,
+      openFrames: (_, _) async => FakeFrames(),
+    );
+    await portal.start();
+    final frame = await portal.captureFrame();
+    transport.events.add(null);
+    await portal.start();
+    expect(() => portal.moveToFrame(frame, 0, 0), throwsStateError);
+  });
+
+  test('failed stream opening can be retried', () async {
+    var attempts = 0;
+    portal = PortalComputerUse.withTransport(
+      transport,
+      openFrames: (_, _) async {
+        if (++attempts == 1) throw StateError('No plugin');
+        return FakeFrames();
+      },
+    );
+    await portal.start();
+    await expectLater(portal.captureFrame(), throwsStateError);
+    expect((await portal.captureFrame()).pixelSize, const Size(2048, 1536));
+  });
+
+  test(
+    'pixel mapping handles scaled images and fractional logical coordinates',
+    () {
+      final frame = PortalFrame.fromPng(
+        pngHeader(2048, 1536),
+        const Size(1024, 768),
+        Object(),
+      );
+      expect(frame.logicalPoint(1, 1), (x: 0.5, y: 0.5));
+      expect(frame.logicalPoint(256, 192, imageSize: const Size(512, 384)), (
+        x: 512.0,
+        y: 384.0,
+      ));
+      expect(frame.logicalPoint(2047, 1535), (x: 1023.5, y: 767.5));
+      expect(() => frame.logicalPoint(2048, 0), throwsRangeError);
+      expect(() => frame.logicalPoint(double.nan, 0), throwsRangeError);
+      expect(
+        () => frame.logicalPoint(0, 0, imageSize: const Size(0, 1)),
+        throwsRangeError,
+      );
+      expect(
+        () => PortalFrame.fromPng(Uint8List(33), const Size(1, 1), Object()),
+        throwsFormatException,
+      );
+      expect(
+        () => PortalFrame.fromPng(pngHeader(0, 1), const Size(1, 1), Object()),
+        throwsFormatException,
+      );
+    },
+  );
+
+  test('requests one monitor and both input devices', () async {
+    await portal.start();
+    expect(portal.isActive, isTrue);
+    expect(portal.sharedSize, const Size(1024, 768));
+    expect(transport.requests, [
+      'RemoteDesktop.CreateSession',
+      'RemoteDesktop.SelectDevices',
+      'ScreenCast.SelectSources',
+      'RemoteDesktop.Start',
+    ]);
+    await expectLater(portal.start(), throwsStateError);
+  });
+
+  test('screen sharing without remote interaction closes session', () async {
+    transport.devices = 0;
+    await expectLater(portal.start(), throwsStateError);
+    expect(portal.isActive, isFalse);
+    expect(transport.sessionsClosed, 1);
+    expect(() => portal.moveTo(0, 0), throwsStateError);
+  });
+
+  test('cancelled Start closes session and permits retry', () async {
+    transport.failAt = 'Start';
+    await expectLater(portal.start(), throwsA(isA<PortalResponseException>()));
+    expect(transport.sessionsClosed, 1);
+    transport.failAt = null;
+    await portal.start();
+    expect(portal.isActive, isTrue);
+  });
+
+  test('revocation disables further input', () async {
+    await portal.start();
+    transport.events.add(null);
+    expect(portal.isActive, isFalse);
+    expect(portal.sharedSize, isNull);
+    expect(() => portal.keysym(97, pressed: true), throwsStateError);
+  });
+
+  test('absolute pointer uses stream node and logical coordinates', () async {
+    await portal.start();
+    await portal.moveTo(512, 384);
+    final (method, args) = transport.inputs.single;
+    expect(method, 'NotifyPointerMotionAbsolute');
+    expect(args[0], DBusObjectPath('/session/test'));
+    expect(args.sublist(2), [
+      const DBusUint32(73),
+      const DBusDouble(512),
+      const DBusDouble(384),
+    ]);
+    expect(() => portal.moveTo(1024, 0), throwsRangeError);
+    expect(() => portal.moveTo(-1, 0), throwsRangeError);
+  });
+
+  test('click maps Linux button codes and release', () async {
+    await portal.start();
+    await portal.click(MouseButton.right);
+    expect(transport.inputs.map((i) => i.$2.sublist(2)).toList(), [
+      [const DBusInt32(0x111), const DBusUint32(1)],
+      [const DBusInt32(0x111), const DBusUint32(0)],
+    ]);
+  });
+
+  test('text sends paired ASCII, Unicode, and Return keysyms', () async {
+    await portal.start();
+    await portal.type('a😀\n');
+    expect(transport.inputs.map((i) => i.$2[2].asInt32()).toList(), [
+      97,
+      97,
+      0x0101f600,
+      0x0101f600,
+      0xff0d,
+      0xff0d,
+    ]);
+    expect(transport.inputs.map((i) => i.$2[3].asUint32()).toList(), [
+      1,
+      0,
+      1,
+      0,
+      1,
+      0,
+    ]);
+  });
+
+  test('screenshot reads portal file without removing it', () async {
+    final directory = await Directory.systemTemp.createTemp('nutdart-test-');
+    try {
+      final file = File('${directory.path}/shot.png');
+      await file.writeAsBytes([137, 80, 78, 71]);
+      transport.uri = file.uri.toString();
+      expect(await portal.capture(), [137, 80, 78, 71]);
+      expect(await file.exists(), isTrue);
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
+
+  test('screenshot rejects remote URI', () async {
+    transport.uri = 'https://example.com/shot.png';
+    await expectLater(portal.capture(), throwsStateError);
+  });
+
+  test('close is idempotent and prevents new requests', () async {
+    await portal.start();
+    await portal.close();
+    await portal.close();
+    expect(transport.sessionsClosed, 1);
+    expect(transport.clientsClosed, 1);
+    await expectLater(portal.start(), throwsStateError);
+    await expectLater(portal.capture(), throwsStateError);
+  });
+}

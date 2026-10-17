@@ -10,8 +10,15 @@ import 'png_pixels.dart';
 /// Controlled GNOME/GTK4 test. Shows its own fullscreen red/green button.
 /// Aborts before input if the selected monitor does not show the test surface.
 /// No terminal input, package installation, or native build occurs.
+///
+/// `--target-stdin` reads the test window's state from stdin instead of
+/// starting it. A sandboxed probe (Flatpak or Snap) uses this: the GTK4
+/// window runs on the host, and only the portal client is in the sandbox.
+///   portal_test_target | flatpak run com.telosnex.PortalProbe --target-stdin
 Future<void> main(List<String> arguments) async {
-  final target = await TestTarget.start();
+  final target = arguments.contains('--target-stdin')
+      ? await TestTarget.fromStdin()
+      : await TestTarget.start();
   final portal = PortalComputerUse(consentTimeout: const Duration(minutes: 10));
   Directory? control;
   try {
@@ -200,17 +207,19 @@ void expectColor(PortalFrame frame, bool green) {
 }
 
 class TestTarget {
-  final Process process;
+  /// Null when the window's state comes from stdin. The window then exits
+  /// on SIGPIPE when this process ends.
+  final Process? process;
   final Stopwatch watch = Stopwatch()..start();
   late final StreamSubscription<String> states;
-  late final StreamSubscription<List<int>> errors;
+  StreamSubscription<List<int>>? errors;
   final ready = Completer<void>();
   int clicks = 0;
   final keyEvents = <String>[];
   int _lastStateMs = -1000;
   bool _active = false, _focused = false;
-  TestTarget._(this.process) {
-    states = process.stdout
+  TestTarget._(this.process, Stream<List<int>> output) {
+    states = output
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen((line) {
@@ -231,6 +240,8 @@ class TestTarget {
             ready.complete();
           }
         });
+    final process = this.process;
+    if (process == null) return;
     errors = process.stderr.listen(stderr.add);
     unawaited(
       process.exitCode.then((code) {
@@ -250,7 +261,13 @@ class TestTarget {
       ],
       environment: {'GSK_RENDERER': 'cairo'},
     );
-    final target = TestTarget._(process);
+    return _waitReady(TestTarget._(process, process.stdout));
+  }
+
+  static Future<TestTarget> fromStdin() =>
+      _waitReady(TestTarget._(null, stdin));
+
+  static Future<TestTarget> _waitReady(TestTarget target) async {
     try {
       await target.ready.future.timeout(const Duration(seconds: 10));
       return target;
@@ -272,6 +289,11 @@ class TestTarget {
   }
 
   Future<void> close() async {
+    final process = this.process;
+    if (process == null) {
+      await states.cancel();
+      return;
+    }
     process.kill(ProcessSignal.sigterm);
     try {
       await process.exitCode.timeout(const Duration(seconds: 2));
@@ -280,6 +302,6 @@ class TestTarget {
       await process.exitCode;
     }
     await states.cancel();
-    await errors.cancel();
+    await errors?.cancel();
   }
 }

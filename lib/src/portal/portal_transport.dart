@@ -102,9 +102,9 @@ class DBusPortalTransport implements PortalTransport {
     final result = response.future;
     unawaited(result.then<void>((_) {}, onError: (Object _) {}));
     try {
-      // A round trip orders AddMatch before the portal method call. Ping the
-      // portal: the Flatpak D-Bus proxy denies Peer.Ping to the bus itself.
-      await _client.ping(owner).timeout(timeout);
+      // A bus round trip orders AddMatch before the portal method call.
+      // Not Peer.Ping: Flatpak denies it to the bus, Snap to every peer.
+      await _client.getNameOwner(portalName).timeout(timeout);
       final reply = await _object(portalPath)
           .callMethod('$portalInterface$interface', method, [
             ...arguments,
@@ -200,7 +200,7 @@ class DBusPortalTransport implements PortalTransport {
           }
         });
     try {
-      await _client.ping(owner).timeout(timeout); // See request().
+      await _client.getNameOwner(portalName).timeout(timeout); // request()
       final result = await request(
         'Inhibit',
         'CreateMonitor',

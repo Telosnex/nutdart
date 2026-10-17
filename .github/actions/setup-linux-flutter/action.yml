@@ -1,0 +1,52 @@
+name: Set up pinned Linux Flutter SDK
+description: Verify or install Flutter and precache Linux artifacts; callers own caches.
+inputs:
+  architecture:
+    description: Flutter artifact architecture (arm64 or x64).
+    required: true
+  sdk-path:
+    description: Absolute SDK location, matching the caller's cache path.
+    required: true
+  flutter-version:
+    description: Flutter release tag.
+    required: true
+  framework-revision:
+    description: Reviewed framework commit for the release tag.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Verify and precache SDK
+      shell: bash
+      env:
+        SDK_ARCHITECTURE: ${{ inputs.architecture }}
+        SDK_PATH: ${{ inputs.sdk-path }}
+        FLUTTER_VERSION: ${{ inputs.flutter-version }}
+        FLUTTER_FRAMEWORK_REVISION: ${{ inputs.framework-revision }}
+      # Bootstrap needs Bash: the pinned SDK supplies Dart only after precache.
+      run: |
+        set -euo pipefail
+        test "$(uname -s)" = Linux
+        case "$SDK_ARCHITECTURE" in
+          arm64) expected_arch=aarch64 ;;
+          x64) expected_arch=x86_64 ;;
+          *) echo 'Unsupported Linux Flutter architecture' >&2; exit 2 ;;
+        esac
+        test "$(uname -m)" = "$expected_arch"
+        sdk="$SDK_PATH"
+        if [[ ! -d "$sdk/.git" ]]; then
+          test ! -e "$sdk"
+          git clone --filter=blob:none --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$sdk"
+          test "$(git -C "$sdk" rev-parse HEAD)" = "$FLUTTER_FRAMEWORK_REVISION"
+          git -C "$sdk" switch -c stable
+        fi
+        test "$(git -C "$sdk" rev-parse HEAD)" = "$FLUTTER_FRAMEWORK_REVISION"
+        printf 'FLUTTER_ROOT=%s\n' "$sdk" >> "$GITHUB_ENV"
+        printf '%s\n' "$sdk/bin" "$sdk/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
+        export FLUTTER_ROOT="$sdk"
+        export PATH="$sdk/bin:$sdk/bin/cache/dart-sdk/bin:$PATH"
+        flutter config --no-analytics
+        flutter precache --linux
+        test -x "$sdk/bin/cache/dart-sdk/bin/dart"
+        test -x "$sdk/bin/cache/artifacts/engine/linux-$SDK_ARCHITECTURE/flutter_tester"

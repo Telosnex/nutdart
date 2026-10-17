@@ -5,19 +5,24 @@ on:
 permissions:
   contents: read
 env:
+  # Same pins as Telosnex warpbuild_unit_tests.yml.
   FLUTTER_VERSION: '3.47.1'
+  FLUTTER_FRAMEWORK_REVISION: 6655482ec06e547f90abf8ae7590466f4415978d
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      # A plain clone: flutter-action uses actions/cache by tag, which the
-      # organization SHA-pinning rule rejects.
-      - name: Install Flutter
-        run: |
-          git clone --depth 1 --branch "$FLUTTER_VERSION" \
-            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
-          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+        with:
+          persist-credentials: false
+      # Copy of Telosnex .github/actions/setup-linux-flutter.
+      - name: Set up pinned Linux x64 Flutter SDK
+        uses: ./.github/actions/setup-linux-flutter
+        with:
+          architecture: x64
+          sdk-path: ${{ runner.temp }}/flutter-${{ env.FLUTTER_VERSION }}-x64
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          framework-revision: ${{ env.FLUTTER_FRAMEWORK_REVISION }}
       - run: flutter pub get
       # I3: the Linux code starts no process.
       - run: flutter test test/no_process_spawn_test.dart

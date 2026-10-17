@@ -9,15 +9,32 @@ import 'package:nutdart/src/nutdart_model.dart';
 import 'package:nutdart/src/portal/portal_transport.dart';
 import 'package:nutdart/src/portal/pipewire_frames.dart';
 
+const monitorPath = '/session/monitor';
+
 class FakeTransport implements PortalTransport {
   final requests = <String>[];
   final inputs = <(String, List<DBusValue>)>[];
-  final events = StreamController<void>.broadcast(sync: true);
+  final closedControllers = <String, StreamController<void>>{};
   int devices = 3;
   String? failAt;
   String? uri;
   int sessionsClosed = 0;
+  int monitorsClosed = 0;
   int clientsClosed = 0;
+  bool monitorFails = false;
+  final initialStates = <Map<String, DBusValue>>[];
+  final queryEnds = <String>[];
+  void Function(String monitor, Map<String, DBusValue> state)? _onState;
+  void Function(String method)? beforeReply;
+
+  StreamController<void> closedFor(String path) => closedControllers
+      .putIfAbsent(path, () => StreamController<void>.broadcast(sync: true));
+
+  /// Closed signal source for the remote desktop session.
+  StreamController<void> get events => closedFor('/session/test');
+
+  void state(Map<String, DBusValue> values) => _onState!(monitorPath, values);
+
   @override
   Future<Map<String, DBusValue>> request(
     String interface,
@@ -26,6 +43,7 @@ class FakeTransport implements PortalTransport {
     Map<String, DBusValue> options,
   ) async {
     requests.add('$interface.$method');
+    beforeReply?.call(method);
     if (method == failAt) throw PortalResponseException(method, 1);
     return switch (method) {
       'Screenshot' => {'uri': DBusString(uri!)},
@@ -54,18 +72,49 @@ class FakeTransport implements PortalTransport {
   }
 
   @override
-  Stream<void> closed(String session) => events.stream;
+  Stream<void> closed(String session) => closedFor(session).stream;
   @override
   Future<void> closeSession(String session) async {
-    sessionsClosed++;
+    if (session == monitorPath) {
+      monitorsClosed++;
+    } else {
+      sessionsClosed++;
+    }
+  }
+
+  @override
+  Future<String> createStateMonitor(
+    void Function(String monitor, Map<String, DBusValue> state) onState,
+  ) async {
+    requests.add('Inhibit.CreateMonitor');
+    if (monitorFails) throw StateError('No Inhibit portal');
+    _onState = onState;
+    for (final state in initialStates) {
+      onState(monitorPath, state);
+    }
+    return monitorPath;
+  }
+
+  @override
+  Future<void> queryEndResponse(String monitor) async {
+    queryEnds.add(monitor);
   }
 
   @override
   Future<void> close() async {
     clientsClosed++;
-    await events.close();
+    for (final controller in closedControllers.values) {
+      await controller.close();
+    }
   }
 }
+
+List<String> methods(FakeTransport transport) =>
+    transport.inputs.map((input) => input.$1).toList();
+
+/// Arguments after the session handle and options.
+List<List<DBusValue>> inputArgs(FakeTransport transport) =>
+    transport.inputs.map((input) => input.$2.sublist(2)).toList();
 
 Uint8List pngHeader(int width, int height) {
   final bytes = Uint8List(33);
@@ -269,6 +318,7 @@ void main() {
     expect(portal.isActive, isTrue);
     expect(portal.sharedSize, const Size(1024, 768));
     expect(transport.requests, [
+      'Inhibit.CreateMonitor',
       'RemoteDesktop.CreateSession',
       'RemoteDesktop.SelectDevices',
       'ScreenCast.SelectSources',
@@ -363,6 +413,252 @@ void main() {
   test('screenshot rejects remote URI', () async {
     transport.uri = 'https://example.com/shot.png';
     await expectLater(portal.capture(), throwsStateError);
+  });
+
+  group('scroll', () {
+    test('sends discrete steps per axis and skips zero axes', () async {
+      await portal.start();
+      await portal.scroll(vertical: 3);
+      await portal.scroll(horizontal: -2);
+      await portal.scroll(vertical: -1, horizontal: 4);
+      await portal.scroll();
+      expect(methods(transport), everyElement('NotifyPointerAxisDiscrete'));
+      expect(inputArgs(transport), [
+        [const DBusUint32(0), const DBusInt32(3)],
+        [const DBusUint32(1), const DBusInt32(-2)],
+        [const DBusUint32(0), const DBusInt32(-1)],
+        [const DBusUint32(1), const DBusInt32(4)],
+      ]);
+    });
+
+    test('rejects out-of-range steps and inactive sessions', () async {
+      await expectLater(portal.scroll(vertical: 1), throwsStateError);
+      await portal.start();
+      await expectLater(portal.scroll(vertical: 1001), throwsRangeError);
+      await expectLater(portal.scroll(horizontal: -1001), throwsRangeError);
+      expect(transport.inputs, isEmpty);
+    });
+  });
+
+  group('key names', () {
+    test('map names, aliases, and characters to keysyms', () {
+      expect(portalKeysym('Return'), 0xff0d);
+      expect(portalKeysym('enter'), 0xff0d);
+      expect(portalKeysym('Escape'), 0xff1b);
+      expect(portalKeysym('esc'), 0xff1b);
+      expect(portalKeysym('BackSpace'), 0xff08);
+      expect(portalKeysym('Page_Up'), 0xff55);
+      expect(portalKeysym('pagedown'), 0xff56);
+      expect(portalKeysym('Left'), 0xff51);
+      expect(portalKeysym('F1'), 0xffbe);
+      expect(portalKeysym('f12'), 0xffc9);
+      expect(portalKeysym('F24'), 0xffd5);
+      expect(portalKeysym('ctrl'), 0xffe3);
+      expect(portalKeysym('Control_L'), 0xffe3);
+      expect(portalKeysym('shift'), 0xffe1);
+      expect(portalKeysym('alt'), 0xffe9);
+      for (final name in ['cmd', 'super', 'meta', 'win', 'Super_L']) {
+        expect(portalKeysym(name), 0xffeb, reason: name);
+      }
+      expect(portalKeysym('a'), 0x61);
+      expect(portalKeysym('A'), 0x41);
+      expect(portalKeysym(' '), 0x20);
+      expect(portalKeysym('é'), 0xe9);
+      expect(portalKeysym('€'), 0x010020ac);
+      expect(portalKeysym('XF86AudioMute'), 0x1008ff12);
+    });
+
+    test('reject unknown names', () {
+      for (final name in ['', 'F25', 'f0', 'hyper', 'ctrlx', '\u0001']) {
+        expect(() => portalKeysym(name), throwsArgumentError, reason: name);
+      }
+      expect(() => portalKeysym('\x7f'), throwsArgumentError);
+    });
+
+    test('parse combinations including the plus key', () {
+      expect(parsePortalKeyCombo('ctrl+shift+n'), [0xffe3, 0xffe1, 0x6e]);
+      expect(parsePortalKeyCombo('cmd+c'), [0xffeb, 0x63]);
+      expect(parsePortalKeyCombo('ctrl++'), [0xffe3, 0x2b]);
+      expect(parsePortalKeyCombo('+'), [0x2b]);
+      expect(parsePortalKeyCombo(' ctrl + a '), [0xffe3, 0x61]);
+      for (final combo in ['', 'ctrl+', '+a', 'ctrl++a', 'ctrl+bogus']) {
+        expect(
+          () => parsePortalKeyCombo(combo),
+          throwsArgumentError,
+          reason: combo,
+        );
+      }
+    });
+
+    test('tapKeys presses in order and releases in reverse', () async {
+      await portal.start();
+      await portal.tapKeys('ctrl+shift+n');
+      expect(methods(transport), everyElement('NotifyKeyboardKeysym'));
+      expect(inputArgs(transport), [
+        [const DBusInt32(0xffe3), const DBusUint32(1)],
+        [const DBusInt32(0xffe1), const DBusUint32(1)],
+        [const DBusInt32(0x6e), const DBusUint32(1)],
+        [const DBusInt32(0x6e), const DBusUint32(0)],
+        [const DBusInt32(0xffe1), const DBusUint32(0)],
+        [const DBusInt32(0xffe3), const DBusUint32(0)],
+      ]);
+    });
+
+    test('unknown names and invalid text send nothing', () async {
+      await portal.start();
+      expect(() => portal.tapKeys('ctrl+bogus'), throwsArgumentError);
+      expect(() => portal.key('bogus', pressed: true), throwsArgumentError);
+      await expectLater(portal.type('a\uD800'), throwsArgumentError);
+      expect(transport.inputs, isEmpty);
+    });
+  });
+
+  group('session end', () {
+    test('screen lock ends control and reports it', () async {
+      final ended = <PortalSessionEnd>[];
+      portal.ended.listen(ended.add);
+      await portal.start();
+      expect(portal.lockMonitored, isTrue);
+      transport.state({'screensaver-active': const DBusBoolean(false)});
+      expect(portal.isActive, isTrue);
+      transport.state({'screensaver-active': const DBusBoolean(true)});
+      expect(portal.isActive, isFalse);
+      expect(() => portal.moveTo(0, 0), throwsStateError);
+      await Future<void>.delayed(Duration.zero);
+      expect(ended, [PortalSessionEnd.locked]);
+      expect(transport.sessionsClosed, 1);
+      expect(transport.monitorsClosed, 1);
+    });
+
+    test('a locked screen at start fails before remote desktop', () async {
+      final ended = <PortalSessionEnd>[];
+      portal.ended.listen(ended.add);
+      transport.initialStates.add({
+        'screensaver-active': const DBusBoolean(true),
+      });
+      await expectLater(portal.start(), throwsStateError);
+      expect(transport.requests, ['Inhibit.CreateMonitor']);
+      expect(transport.monitorsClosed, 1);
+      expect(portal.isActive, isFalse);
+      await Future<void>.delayed(Duration.zero);
+      expect(ended, isEmpty);
+    });
+
+    test('a lock during the consent dialog fails start', () async {
+      transport.beforeReply = (method) {
+        if (method == 'Start') {
+          transport.state({'screensaver-active': const DBusBoolean(true)});
+        }
+      };
+      await expectLater(portal.start(), throwsStateError);
+      expect(portal.isActive, isFalse);
+      expect(transport.sessionsClosed, 1);
+      transport.beforeReply = null;
+      await portal.start();
+      expect(portal.isActive, isTrue);
+    });
+
+    test('revocation during start fails start', () async {
+      transport.beforeReply = (method) {
+        if (method == 'Start') transport.events.add(null);
+      };
+      await expectLater(portal.start(), throwsStateError);
+      expect(portal.isActive, isFalse);
+    });
+
+    test('query end acknowledges and ends control', () async {
+      final ended = <PortalSessionEnd>[];
+      portal.ended.listen(ended.add);
+      await portal.start();
+      transport.state({'session-state': const DBusUint32(2)});
+      expect(portal.isActive, isFalse);
+      expect(transport.queryEnds, [monitorPath]);
+      await Future<void>.delayed(Duration.zero);
+      expect(ended, [PortalSessionEnd.sessionEnding]);
+    });
+
+    test('lost lock monitor ends control', () async {
+      final ended = <PortalSessionEnd>[];
+      portal.ended.listen(ended.add);
+      await portal.start();
+      transport.closedFor(monitorPath).add(null);
+      expect(portal.isActive, isFalse);
+      await Future<void>.delayed(Duration.zero);
+      expect(ended, [PortalSessionEnd.monitorLost]);
+    });
+
+    test('missing lock monitor blocks start by default', () async {
+      transport.monitorFails = true;
+      await expectLater(
+        portal.start(),
+        throwsA(isA<PortalLockMonitorUnavailable>()),
+      );
+      expect(transport.requests, ['Inhibit.CreateMonitor']);
+    });
+
+    test('missing lock monitor is allowed when not required', () async {
+      transport.monitorFails = true;
+      portal = PortalComputerUse.withTransport(
+        transport,
+        requireLockMonitor: false,
+      );
+      await portal.start();
+      expect(portal.isActive, isTrue);
+      expect(portal.lockMonitored, isFalse);
+    });
+
+    test('stop releases held input and permits a new start', () async {
+      final ended = <PortalSessionEnd>[];
+      portal.ended.listen(ended.add);
+      await portal.start();
+      await portal.key('ctrl', pressed: true);
+      await portal.key('shift', pressed: true);
+      await portal.button(MouseButton.left, pressed: true);
+      transport.inputs.clear();
+      await portal.stop();
+      expect(inputArgs(transport), [
+        [const DBusInt32(0x110), const DBusUint32(0)],
+        [const DBusInt32(0xffe1), const DBusUint32(0)],
+        [const DBusInt32(0xffe3), const DBusUint32(0)],
+      ]);
+      expect(transport.sessionsClosed, 1);
+      expect(transport.monitorsClosed, 1);
+      await Future<void>.delayed(Duration.zero);
+      expect(ended, [PortalSessionEnd.stopped]);
+      await portal.start();
+      expect(portal.isActive, isTrue);
+    });
+
+    test('released input is not released again on stop', () async {
+      await portal.start();
+      await portal.tapKeys('ctrl+a');
+      await portal.click();
+      transport.inputs.clear();
+      await portal.stop();
+      expect(transport.inputs, isEmpty);
+    });
+
+    test('revocation sends no release to the closed session', () async {
+      final ended = <PortalSessionEnd>[];
+      portal.ended.listen(ended.add);
+      await portal.start();
+      await portal.key('ctrl', pressed: true);
+      transport.inputs.clear();
+      transport.events.add(null);
+      await Future<void>.delayed(Duration.zero);
+      expect(transport.inputs, isEmpty);
+      expect(ended, [PortalSessionEnd.revoked]);
+    });
+
+    test('close releases held input', () async {
+      await portal.start();
+      await portal.key('alt', pressed: true);
+      transport.inputs.clear();
+      await portal.close();
+      expect(inputArgs(transport), [
+        [const DBusInt32(0xffe9), const DBusUint32(0)],
+      ]);
+    });
   });
 
   test('close is idempotent and prevents new requests', () async {

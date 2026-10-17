@@ -5,35 +5,80 @@ import 'dart:typed_data';
 import 'package:dbus/dbus.dart';
 
 import '../nutdart_model.dart';
+import 'portal_keys.dart';
 import 'portal_transport.dart';
 import 'pipewire_frames.dart';
 import 'portal_frame.dart';
 
 export 'portal_frame.dart';
+export 'portal_keys.dart' show portalKeysym, parsePortalKeyCombo;
 
 export 'portal_transport.dart' show PortalResponseException;
+
+/// Why an active control session ended.
+enum PortalSessionEnd {
+  /// The app called [PortalComputerUse.stop] or [PortalComputerUse.close].
+  stopped,
+
+  /// The desktop closed the session, for example from its sharing indicator.
+  revoked,
+
+  /// The screen saver or lock screen became active.
+  locked,
+
+  /// The user session is logging out or ending.
+  sessionEnding,
+
+  /// The desktop closed the lock monitor, so locks can no longer be detected.
+  monitorLost,
+}
+
+/// The desktop cannot report screen locks (Inhibit monitor unavailable).
+class PortalLockMonitorUnavailable implements Exception {
+  final Object cause;
+  const PortalLockMonitorUnavailable(this.cause);
+  @override
+  String toString() => 'Desktop portal cannot report screen locks: $cause';
+}
 
 /// A user-approved Linux remote desktop session.
 /// Coordinates are local to the single shared monitor, in portal logical units.
 /// Screenshots contain encoded PNG bytes, not the legacy API's raw bitmap.
 /// No window enumeration or global pointer-position query exists in this API.
+///
+/// The session ends when the app stops it, the desktop revokes it, the screen
+/// locks, or the user session ends. [ended] reports the reason. Keys and
+/// buttons that are still pressed are released when the app stops a session.
 class PortalComputerUse {
   final PortalTransport _transport;
+
+  /// When true, [start] fails unless the desktop provides an Inhibit monitor
+  /// to report screen locks.
+  final bool requireLockMonitor;
   String? _session;
+  String? _monitor;
   StreamSubscription<void>? _closed;
+  StreamSubscription<void>? _monitorClosed;
   bool _disposed = false;
   Future<void>? _closing;
   bool _starting = false;
+  PortalSessionEnd? _startAbort;
+  Future<void>? _ending;
   int? _streamNode;
   Size? _size;
   Object _identity = Object();
   Future<PortalFrameSource>? _frames;
   Future<void> _closingFrames = Future.value();
   final Future<PortalFrameSource> Function(int, int) _openFrames;
+  final _heldKeysyms = <int>[];
+  final _heldButtons = <int>[];
+  final _ended = StreamController<PortalSessionEnd>.broadcast();
 
-  PortalComputerUse({Duration consentTimeout = const Duration(minutes: 3)})
-    : _transport = DBusPortalTransport(timeout: consentTimeout),
-      _openFrames = PipeWireFrames.open {
+  PortalComputerUse({
+    Duration consentTimeout = const Duration(minutes: 3),
+    this.requireLockMonitor = true,
+  }) : _transport = DBusPortalTransport(timeout: consentTimeout),
+       _openFrames = PipeWireFrames.open {
     if (!Platform.isLinux) {
       throw UnsupportedError('Desktop portals require Linux');
     }
@@ -43,28 +88,40 @@ class PortalComputerUse {
   PortalComputerUse.withTransport(
     this._transport, {
     Future<PortalFrameSource> Function(int, int)? openFrames,
+    this.requireLockMonitor = true,
   }) : _openFrames = openFrames ?? PipeWireFrames.open;
 
   bool get isActive => _session != null && _streamNode != null && !_disposed;
   Size? get sharedSize => isActive ? _size : null;
+
+  /// Whether the desktop reports screen locks for the active session.
+  bool get lockMonitored => isActive && _monitor != null;
+
+  /// One event each time an active session ends.
+  Stream<PortalSessionEnd> get ended => _ended.stream;
 
   void _checkOpen() {
     if (_disposed) throw StateError('Portal client is closed');
   }
 
   /// Request keyboard, pointer, and one monitor. Call from a user action.
-  /// Throws if the user shares a screen without allowing remote interaction.
+  /// Throws if the user shares a screen without allowing remote interaction,
+  /// if the screen locks before approval, or with
+  /// [PortalLockMonitorUnavailable] when [requireLockMonitor] is set and the
+  /// desktop cannot report locks.
   Future<void> start({String parentWindow = ''}) async {
     _checkOpen();
     if (_starting || _session != null) {
       throw StateError('A portal session is already open or starting');
     }
     _starting = true;
+    _startAbort = null;
     try {
+      await _ending;
       await _closeFrames();
-      _identity = Object();
-      await _closed?.cancel();
-      _closed = null;
+      final identity = _identity = Object();
+      await _startMonitor(identity);
+      _checkStartAbort();
       final created = await _transport
           .request('RemoteDesktop', 'CreateSession', [], {
             'session_handle_token': DBusString(
@@ -73,21 +130,13 @@ class PortalComputerUse {
           });
       final path = created['session_handle']!.asString();
       _session = path;
-      void revoked() {
-        if (_session == path) {
-          _session = null;
-          _streamNode = null;
-          _size = null;
-          unawaited(_closeFrames());
-        }
-      }
-
       _closed = _transport
           .closed(path)
           .listen(
-            (_) => revoked(),
-            onError: (Object _) => revoked(),
-            onDone: revoked,
+            (_) => _desktopEnd(identity, PortalSessionEnd.revoked),
+            onError: (Object _) =>
+                _desktopEnd(identity, PortalSessionEnd.revoked),
+            onDone: () => _desktopEnd(identity, PortalSessionEnd.revoked),
           );
       final session = DBusObjectPath(path);
       await _transport.request(
@@ -102,6 +151,7 @@ class PortalComputerUse {
         [session],
         {'types': const DBusUint32(1), 'multiple': const DBusBoolean(false)},
       );
+      _checkStartAbort();
       final result = await _transport.request('RemoteDesktop', 'Start', [
         session,
         DBusString(parentWindow),
@@ -124,21 +174,88 @@ class PortalComputerUse {
       if (width <= 0 || height <= 0) {
         throw StateError('Invalid shared monitor size');
       }
-      if (_session != path || _disposed) {
+      _checkStartAbort();
+      if (_disposed || !identical(identity, _identity)) {
         throw StateError('Portal session was revoked');
       }
       _streamNode = stream[0].asUint32();
       _size = Size(width, height);
     } catch (_) {
-      await _endSession();
+      await _endSession(PortalSessionEnd.stopped);
       rethrow;
     } finally {
       _starting = false;
+      _startAbort = null;
     }
+  }
+
+  void _checkStartAbort() {
+    final reason = _startAbort;
+    if (reason != null) {
+      throw StateError('Portal session ended: ${reason.name}');
+    }
+  }
+
+  Future<void> _startMonitor(Object identity) async {
+    final String monitor;
+    try {
+      monitor = await _transport.createStateMonitor(
+        (_, state) => _onState(identity, state),
+      );
+    } catch (error) {
+      if (requireLockMonitor) throw PortalLockMonitorUnavailable(error);
+      return;
+    }
+    if (!identical(identity, _identity)) {
+      try {
+        await _transport.closeSession(monitor);
+      } catch (_) {}
+      return;
+    }
+    _monitor = monitor;
+    void lost() {
+      if (requireLockMonitor) {
+        _desktopEnd(identity, PortalSessionEnd.monitorLost);
+      } else if (identical(identity, _identity)) {
+        _monitor = null;
+      }
+    }
+
+    _monitorClosed = _transport
+        .closed(monitor)
+        .listen((_) => lost(), onError: (Object _) => lost(), onDone: lost);
+  }
+
+  void _onState(Object identity, Map<String, DBusValue> state) {
+    if (!identical(identity, _identity)) return;
+    final phase = state['session-state']?.asUint32();
+    if (phase == 2) {
+      final monitor = _monitor;
+      if (monitor != null) {
+        unawaited(
+          _transport.queryEndResponse(monitor).catchError((Object _) {}),
+        );
+      }
+    }
+    if (phase == 2 || phase == 3) {
+      _desktopEnd(identity, PortalSessionEnd.sessionEnding);
+    } else if (state['screensaver-active']?.asBoolean() == true) {
+      _desktopEnd(identity, PortalSessionEnd.locked);
+    }
+  }
+
+  void _desktopEnd(Object identity, PortalSessionEnd reason) {
+    if (!identical(identity, _identity)) return;
+    if (_starting) {
+      _startAbort ??= reason;
+      return;
+    }
+    unawaited(_endSession(reason));
   }
 
   /// One still image. Consent can be separate from remote-control consent.
   /// The desktop-owned screenshot file is not deleted by this client.
+  /// Computer use should call [captureFrame] instead.
   Future<Uint8List> capture({String parentWindow = ''}) async {
     _checkOpen();
     final result = await _transport.request(
@@ -249,30 +366,61 @@ class PortalComputerUse {
     ]);
   }
 
-  Future<void> button(MouseButton button, {required bool pressed}) =>
-      _input('NotifyPointerButton', [
-        DBusInt32(switch (button) {
-          MouseButton.left => 0x110,
-          MouseButton.right => 0x111,
-          MouseButton.middle => 0x112,
-        }),
-        DBusUint32(pressed ? 1 : 0),
-      ]);
+  Future<void> button(MouseButton button, {required bool pressed}) async {
+    final code = switch (button) {
+      MouseButton.left => 0x110,
+      MouseButton.right => 0x111,
+      MouseButton.middle => 0x112,
+    };
+    await _input('NotifyPointerButton', [
+      DBusInt32(code),
+      DBusUint32(pressed ? 1 : 0),
+    ]);
+    _heldButtons.remove(code);
+    if (pressed) _heldButtons.add(code);
+  }
 
   Future<void> click([MouseButton mouseButton = MouseButton.left]) async {
     await button(mouseButton, pressed: true);
     await button(mouseButton, pressed: false);
   }
 
+  /// Scroll by wheel steps at the current pointer position.
+  /// Positive [vertical] scrolls down. Positive [horizontal] scrolls right.
+  /// Each value must be in -1000..1000.
+  Future<void> scroll({int vertical = 0, int horizontal = 0}) async {
+    for (final steps in [vertical, horizontal]) {
+      if (steps < -1000 || steps > 1000) {
+        throw RangeError.range(steps, -1000, 1000, 'steps');
+      }
+    }
+    if (!isActive) throw StateError('No approved remote desktop session');
+    // Mutter rejects zero steps, so skip an unused axis.
+    if (vertical != 0) {
+      await _input('NotifyPointerAxisDiscrete', [
+        const DBusUint32(0),
+        DBusInt32(vertical),
+      ]);
+    }
+    if (horizontal != 0) {
+      await _input('NotifyPointerAxisDiscrete', [
+        const DBusUint32(1),
+        DBusInt32(horizontal),
+      ]);
+    }
+  }
+
   /// Send an XKB keysym. State 1 presses the key. State 0 releases it.
-  Future<void> keysym(int value, {required bool pressed}) {
+  Future<void> keysym(int value, {required bool pressed}) async {
     if (value < 0 || value > 0x1fffffff) {
       throw RangeError.value(value, 'keysym');
     }
-    return _input('NotifyKeyboardKeysym', [
+    await _input('NotifyKeyboardKeysym', [
       DBusInt32(value),
       DBusUint32(pressed ? 1 : 0),
     ]);
+    _heldKeysyms.remove(value);
+    if (pressed) _heldKeysyms.add(value);
   }
 
   Future<void> tapKeysym(int value) async {
@@ -280,33 +428,89 @@ class PortalComputerUse {
     await keysym(value, pressed: false);
   }
 
+  /// Press or release a named key. See [portalKeysym] for names.
+  Future<void> key(String name, {required bool pressed}) =>
+      keysym(portalKeysym(name), pressed: pressed);
+
+  /// Press a key combination such as `ctrl+shift+n`, then release it in
+  /// reverse order. Unknown names throw before any key is pressed.
+  Future<void> tapKeys(String combo) async {
+    final keysyms = parsePortalKeyCombo(combo);
+    final pressed = <int>[];
+    try {
+      for (final value in keysyms) {
+        await keysym(value, pressed: true);
+        pressed.add(value);
+      }
+    } finally {
+      // An ended session releases held keys itself.
+      for (final value in pressed.reversed) {
+        if (!isActive) break;
+        await keysym(value, pressed: false);
+      }
+    }
+  }
+
   /// Send text as keysyms. This is not clipboard paste or an input-method API.
   Future<void> type(String text) async {
-    for (final rune in text.runes) {
-      final value = switch (rune) {
-        10 => 0xff0d, // Return
-        9 => 0xff09, // Tab
-        < 0x20 => throw ArgumentError('Unsupported control character'),
-        <= 0xff => rune,
-        _ => 0x01000000 | rune,
-      };
+    final keysyms = text.runes.map(keysymForRune).toList();
+    for (final value in keysyms) {
       await tapKeysym(value);
     }
   }
 
-  Future<void> _endSession() async {
-    final path = _session;
+  /// End the control session and keep the client for a later [start].
+  Future<void> stop() {
+    if (_starting) {
+      return Future.error(StateError('Wait for start() before stopping'));
+    }
+    return _endSession(PortalSessionEnd.stopped);
+  }
+
+  Future<void> _endSession(PortalSessionEnd reason) =>
+      _ending ??= _doEnd(reason).whenComplete(() => _ending = null);
+
+  Future<void> _doEnd(PortalSessionEnd reason) async {
+    // Clear state before the first await so that no new input is accepted.
+    final wasActive = _session != null && _streamNode != null;
+    final path = _session, monitor = _monitor;
+    final keys = [..._heldKeysyms], buttons = [..._heldButtons];
     _session = null;
+    _monitor = null;
     _streamNode = null;
     _size = null;
-    await _closeFrames();
-    await _closed?.cancel();
+    _identity = Object();
+    _heldKeysyms.clear();
+    _heldButtons.clear();
+    final closed = _closed, monitorClosed = _monitorClosed;
     _closed = null;
-    if (path != null) {
+    _monitorClosed = null;
+    if (path != null && reason != PortalSessionEnd.revoked) {
+      for (final (method, values) in [
+        for (final code in buttons.reversed)
+          ('NotifyPointerButton', [DBusInt32(code), const DBusUint32(0)]),
+        for (final value in keys.reversed)
+          ('NotifyKeyboardKeysym', [DBusInt32(value), const DBusUint32(0)]),
+      ]) {
+        try {
+          await _transport.notify(method, [
+            DBusObjectPath(path),
+            DBusDict.stringVariant({}),
+            ...values,
+          ]);
+        } catch (_) {}
+      }
+    }
+    await _closeFrames();
+    await closed?.cancel();
+    await monitorClosed?.cancel();
+    for (final handle in [path, monitor]) {
+      if (handle == null) continue;
       try {
-        await _transport.closeSession(path);
+        await _transport.closeSession(handle);
       } catch (_) {}
     }
+    if (wasActive && !_ended.isClosed) _ended.add(reason);
   }
 
   /// Release consent and close the bus connection. Safe to call more than once.
@@ -322,7 +526,8 @@ class PortalComputerUse {
   Future<void> _close() async {
     if (_disposed) return;
     _disposed = true;
-    await _endSession();
+    await _endSession(PortalSessionEnd.stopped);
     await _transport.close();
+    await _ended.close();
   }
 }

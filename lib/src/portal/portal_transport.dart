@@ -20,6 +20,16 @@ abstract interface class PortalTransport {
   Future<void> notify(String method, List<DBusValue> arguments);
   Stream<void> closed(String session);
   Future<void> closeSession(String session);
+
+  /// Create an Inhibit monitor session and return its handle.
+  /// [onState] receives every StateChanged for that handle, including any
+  /// that arrive before this future completes.
+  Future<String> createStateMonitor(
+    void Function(String monitor, Map<String, DBusValue> state) onState,
+  );
+
+  /// Acknowledge a Query End state within one second of receiving it.
+  Future<void> queryEndResponse(String monitor);
   Future<void> close();
 }
 
@@ -39,6 +49,16 @@ class DBusPortalTransport implements PortalTransport {
   int _counter = 0;
   DBusPortalTransport({this.timeout = const Duration(minutes: 3)});
 
+  Future<String> _portalOwner() async {
+    final owner =
+        await _client.getNameOwner(portalName) ??
+        await _client
+            .startServiceByName(portalName)
+            .then((_) => _client.getNameOwner(portalName));
+    if (owner == null) throw StateError('Desktop portal is unavailable');
+    return owner;
+  }
+
   DBusRemoteObject _object(String path) =>
       DBusRemoteObject(_client, name: portalName, path: DBusObjectPath(path));
 
@@ -50,12 +70,7 @@ class DBusPortalTransport implements PortalTransport {
     Map<String, DBusValue> options,
   ) async {
     // Connect and resolve the sender before the signal subscription.
-    final owner =
-        await _client.getNameOwner(portalName) ??
-        await _client
-            .startServiceByName(portalName)
-            .then((_) => _client.getNameOwner(portalName));
-    if (owner == null) throw StateError('Desktop portal is unavailable');
+    final owner = await _portalOwner();
     final token = 'nutdart_${++_counter}';
     final sender = _client.uniqueName.substring(1).replaceAll('.', '_');
     final path = '$portalPath/request/$sender/$token';
@@ -152,11 +167,82 @@ class DBusPortalTransport implements PortalTransport {
 
   @override
   Future<void> closeSession(String session) async {
+    await _monitors.remove(session)?.cancel();
     await _object(session)
         .callMethod('${portalInterface}Session', 'Close', [])
         .timeout(const Duration(seconds: 5));
   }
 
   @override
-  Future<void> close() => _client.close();
+  Future<String> createStateMonitor(
+    void Function(String monitor, Map<String, DBusValue> state) onState,
+  ) async {
+    final owner = await _portalOwner();
+    String? handle;
+    final early = <(String, Map<String, DBusValue>)>[];
+    // Subscribe before CreateMonitor so that the first state is not lost.
+    final subscription =
+        DBusSignalStream(
+          _client,
+          sender: owner,
+          path: DBusObjectPath(portalPath),
+          interface: '${portalInterface}Inhibit',
+          name: 'StateChanged',
+          signature: DBusSignature('oa{sv}'),
+        ).listen((signal) {
+          final session = signal.values[0].asObjectPath().value;
+          final state = signal.values[1].asStringVariantDict();
+          if (handle == null) {
+            early.add((session, state));
+          } else if (session == handle) {
+            onState(session, state);
+          }
+        });
+    try {
+      await _client.ping().timeout(timeout);
+      final result = await request(
+        'Inhibit',
+        'CreateMonitor',
+        [const DBusString('')],
+        {
+          'session_handle_token': DBusString(
+            'nutdart_monitor_${DateTime.now().microsecondsSinceEpoch}',
+          ),
+        },
+      );
+      // The portal returns this object path as a string (spec erratum).
+      final path = result['session_handle']?.asString();
+      if (path == null) throw StateError('Portal returned no monitor handle');
+      handle = path;
+      for (final (session, state) in early) {
+        if (session == path) onState(path, state);
+      }
+      early.clear();
+      _monitors[path] = subscription;
+      return path;
+    } catch (_) {
+      await subscription.cancel();
+      rethrow;
+    }
+  }
+
+  final _monitors = <String, StreamSubscription<DBusSignal>>{};
+
+  @override
+  Future<void> queryEndResponse(String monitor) async {
+    await _object(portalPath)
+        .callMethod('${portalInterface}Inhibit', 'QueryEndResponse', [
+          DBusObjectPath(monitor),
+        ], replySignature: DBusSignature(''))
+        .timeout(const Duration(seconds: 1));
+  }
+
+  @override
+  Future<void> close() async {
+    for (final subscription in _monitors.values) {
+      await subscription.cancel();
+    }
+    _monitors.clear();
+    await _client.close();
+  }
 }

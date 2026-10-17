@@ -262,8 +262,29 @@ Restart the session after changing monitor resolution, scale, or orientation.
 The separate `capture()` method uses the Screenshot portal. Its image may cover
 a different area and has no input-coordinate mapping.
 
-The prototype supports pointer buttons, absolute motion, keysyms, and text input.
+The prototype supports pointer buttons, absolute motion, discrete scrolling,
+keysyms, named keys, key combinations, and text input.
 It rejects input after session revocation or missing input consent.
+
+`scroll(vertical: 3)` scrolls down three wheel steps. Positive `horizontal`
+scrolls right. Each value must be in -1000..1000.
+`key('ctrl', pressed: true)` and `tapKeys('ctrl+shift+n')` use named keys.
+Names match without case, and multi-character names also without `_`, `-`, or
+spaces. They include the synchronous API's names (`return`, `pageup`, `f1`,
+`control`), X11 names (`BackSpace`, `Page_Up`), and aliases (`ctrl`, `esc`).
+`cmd`, `super`, `meta`, and `win` map to `Super_L`. `portalKeysym(name)` and
+`parsePortalKeyCombo(combo)` validate names without sending input.
+`tapKeys` releases keys in reverse order. An unknown name sends nothing.
+
+`start()` first creates an Inhibit portal monitor. The session ends when the
+screen saver or lock screen starts, when the user session ends, or when the
+desktop closes the monitor. By default, `start()` throws
+`PortalLockMonitorUnavailable` if the desktop has no Inhibit monitor.
+Pass `requireLockMonitor: false` to allow a session without lock detection.
+`ended` reports why an active session ended. `stop()` ends a session and keeps
+the client for another `start()`. `stop()` and `close()` first release keys
+and buttons that are still pressed. After desktop revocation, no release is
+sent because the session no longer exists.
 PipeWire capture requires 64-bit Linux and the GStreamer runtime libraries
 `libgstreamer-1.0`, `libgstapp-1.0`, and `libglib-2.0`, plus the `pipewire`,
 `videoconvert`, `png`, and `appsink` plugins. A sandbox must include these runtimes.
@@ -282,7 +303,9 @@ A static desktop can time out because no new frame exists.
 Native waits run off the UI isolate. Frame waits time out after ten seconds.
 
 The prototype still uses portal input methods rather than libei.
-It has no restore-token persistence, image resizing, scrolling, window control, or global pointer query.
+It has no restore-token persistence, image resizing, window control, or global pointer query.
+Lock detection depends on the desktop sending `screensaver-active`. This is
+untested on a live desktop.
 
 For a consent, stream-capture, and pointer smoke test, run
 `dart run dev/portal_probe.dart` in the Linux desktop session.

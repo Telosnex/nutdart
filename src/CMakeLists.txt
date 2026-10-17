@@ -71,7 +71,6 @@ elseif(UNIX)
         linux/mouse.c
         linux/screen.c
         linux/screengrab.c
-        linux/screengrab_wayland.c
         linux/screengrab_jpeg.c
         linux/window_manager.cc
         linux/xdisplay.c

@@ -183,7 +183,7 @@ This plugin is designed exclusively for **desktop platforms**:
 |----------|---------|-------|
 | macOS    | ✅ Full | Uses ScreenCaptureKit |
 | Windows  | ✅ Full | Uses Win32 API |
-| Linux    | X11 + portal prototype | Synchronous API uses X11. Wayland uses the separate asynchronous portal API. |
+| Linux    | X11 + portal prototype | Synchronous API uses X11. On Wayland, synchronous capture returns null. Use the separate asynchronous portal API. |
 | Web      | ⚠️ Stub | Compiles but functions are no-ops |
 | Android  | ⚠️ Stub | Compiles but functions are no-ops |
 | iOS      | ⚠️ Stub | Compiles but functions are no-ops |

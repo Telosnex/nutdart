@@ -1,0 +1,16 @@
+name: portal
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      # I3: the Linux code starts no process.
+      - run: flutter test test/no_process_spawn_test.dart
+      - run: flutter test test/portal_computer_use_test.dart test/portal_png_pixels_test.dart

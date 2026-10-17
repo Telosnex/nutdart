@@ -8,9 +8,6 @@
 #include <X11/Xutil.h>
 #include "../xdisplay.h"
 
-// Forward declaration for Wayland support
-MMBitmapRef copyMMBitmapFromDisplayInRect_wayland(MMRect rect);
-
 static int is_wayland_session(void) {
     const char *session_type = getenv("XDG_SESSION_TYPE");
     const char *wayland_display = getenv("WAYLAND_DISPLAY");
@@ -51,15 +48,9 @@ static MMBitmapRef copyMMBitmapFromDisplayInRect_x11(MMRect rect)
 
 MMBitmapRef copyMMBitmapFromDisplayInRect(MMRect rect)
 {
-   // First, try to detect if we're running on Wayland
-   if (is_wayland_session()) {
-       MMBitmapRef bitmap = copyMMBitmapFromDisplayInRect_wayland(rect);
-       if (bitmap != NULL) {
-           return bitmap;
-       }
-       // If Wayland capture failed, fall back to X11 (XWayland might be available)
-   }
-   
-   // Use X11 method (works on X11 and XWayland)
+   // A Wayland session has no synchronous capture. XWayland shows only X11
+   // windows. Use the asynchronous portal API (PortalComputerUse) instead.
+   if (is_wayland_session()) return NULL;
+
    return copyMMBitmapFromDisplayInRect_x11(rect);
 }

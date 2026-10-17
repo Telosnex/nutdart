@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'package:dbus/dbus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutdart/nutdart_portal.dart';
-import 'package:nutdart/src/nutdart_model.dart';
 import 'package:nutdart/src/portal/portal_transport.dart';
 import 'package:nutdart/src/portal/pipewire_frames.dart';
 
@@ -418,10 +417,10 @@ void main() {
   group('scroll', () {
     test('sends discrete steps per axis and skips zero axes', () async {
       await portal.start();
-      await portal.scroll(vertical: 3);
-      await portal.scroll(horizontal: -2);
-      await portal.scroll(vertical: -1, horizontal: 4);
-      await portal.scroll();
+      await portal.scrollSteps(vertical: 3);
+      await portal.scrollSteps(horizontal: -2);
+      await portal.scrollSteps(vertical: -1, horizontal: 4);
+      await portal.scrollSteps();
       expect(methods(transport), everyElement('NotifyPointerAxisDiscrete'));
       expect(inputArgs(transport), [
         [const DBusUint32(0), const DBusInt32(3)],
@@ -432,10 +431,13 @@ void main() {
     });
 
     test('rejects out-of-range steps and inactive sessions', () async {
-      await expectLater(portal.scroll(vertical: 1), throwsStateError);
+      await expectLater(portal.scrollSteps(vertical: 1), throwsStateError);
       await portal.start();
-      await expectLater(portal.scroll(vertical: 1001), throwsRangeError);
-      await expectLater(portal.scroll(horizontal: -1001), throwsRangeError);
+      await expectLater(portal.scrollSteps(vertical: 1001), throwsRangeError);
+      await expectLater(
+        portal.scrollSteps(horizontal: -1001),
+        throwsRangeError,
+      );
       expect(transport.inputs, isEmpty);
     });
   });
@@ -658,6 +660,121 @@ void main() {
       expect(inputArgs(transport), [
         [const DBusInt32(0xffe9), const DBusUint32(0)],
       ]);
+    });
+  });
+
+  group('Computer interface', () {
+    test('scroll uses the native sign: positive deltaY is up', () async {
+      await portal.start();
+      final Computer computer = portal;
+      await computer.scroll(0, 3);
+      await computer.scroll(-2, 0);
+      expect(inputArgs(transport), [
+        [const DBusUint32(0), const DBusInt32(-3)],
+        [const DBusUint32(1), const DBusInt32(-2)],
+      ]);
+    });
+
+    test('clickAt and doubleClickAt move, then click', () async {
+      await portal.start();
+      await portal.clickAt(10, 20, MouseButton.right);
+      await portal.doubleClickAt(30, 40);
+      expect(methods(transport), [
+        'NotifyPointerMotionAbsolute',
+        'NotifyPointerButton',
+        'NotifyPointerButton',
+        'NotifyPointerMotionAbsolute',
+        'NotifyPointerButton',
+        'NotifyPointerButton',
+        'NotifyPointerButton',
+        'NotifyPointerButton',
+      ]);
+      expect(inputArgs(transport)[1], [
+        const DBusInt32(0x111),
+        const DBusUint32(1),
+      ]);
+    });
+
+    test('drag is button down, motion, button up', () async {
+      await portal.start();
+      await portal.drag(const Point(1, 2), const Point(3, 4));
+      expect(inputArgs(transport), [
+        [const DBusUint32(73), const DBusDouble(1), const DBusDouble(2)],
+        [const DBusInt32(0x110), const DBusUint32(1)],
+        [const DBusUint32(73), const DBusDouble(3), const DBusDouble(4)],
+        [const DBusInt32(0x110), const DBusUint32(0)],
+      ]);
+    });
+
+    test('drag outside the monitor sends nothing', () async {
+      await portal.start();
+      await expectLater(
+        portal.drag(const Point(1, 2), const Point(1024, 4)),
+        throwsRangeError,
+      );
+      expect(transport.inputs, isEmpty);
+    });
+
+    test('cursorPosition is the last set point, labeled as such', () async {
+      await portal.start();
+      await expectLater(
+        portal.cursorPosition(),
+        throwsA(isA<ComputerActionUnsupported>()),
+      );
+      await portal.moveTo(5, 6);
+      final cursor = await portal.cursorPosition();
+      expect((cursor.point, cursor.isLastSet), (const Point(5, 6), true));
+      await portal.stop();
+      await expectLater(portal.cursorPosition(), throwsStateError);
+      await portal.start();
+      await expectLater(
+        portal.cursorPosition(),
+        throwsA(isA<ComputerActionUnsupported>()),
+      );
+    });
+
+    test('tapWithModifiers checks every name before any key', () async {
+      await portal.start();
+      expect(() => portal.tapWithModifiers('a', ['fn']), throwsArgumentError);
+      expect(() => portal.tapWithModifiers('', ['cmd']), throwsArgumentError);
+      expect(transport.inputs, isEmpty);
+      await portal.tapWithModifiers('c', ['cmd', 'shift']);
+      expect(inputArgs(transport).map((a) => a[0].asInt32()).toList(), [
+        0xffeb,
+        0xffe1,
+        0x63,
+        0x63,
+        0xffe1,
+        0xffeb,
+      ]);
+    });
+
+    test('tap, keyDown, and keyUp send named keysyms', () async {
+      await portal.start();
+      await portal.tap('return');
+      await portal.keyDown('shift');
+      await portal.keyUp('shift');
+      expect(inputArgs(transport), [
+        [const DBusInt32(0xff0d), const DBusUint32(1)],
+        [const DBusInt32(0xff0d), const DBusUint32(0)],
+        [const DBusInt32(0xffe1), const DBusUint32(1)],
+        [const DBusInt32(0xffe1), const DBusUint32(0)],
+      ]);
+    });
+
+    test('screenshot is the stream frame as PNG', () async {
+      portal = PortalComputerUse.withTransport(
+        transport,
+        openFrames: (_, _) async => FakeFrames(),
+      );
+      await portal.start();
+      expect(portal.screenSize, const Size(1024, 768));
+      final shot = await portal.screenshot(
+        maxSmallDimension: 800,
+        maxLargeDimension: 1280,
+      );
+      expect(shot!.mimeType, 'image/png');
+      expect(shot.bytes, pngHeader(2048, 1536));
     });
   });
 

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:dbus/dbus.dart';
 
+import '../computer.dart';
 import '../nutdart_model.dart';
 import 'portal_keys.dart';
 import 'portal_transport.dart';
@@ -15,23 +16,8 @@ export 'portal_keys.dart' show portalKeysym, parsePortalKeyCombo;
 
 export 'portal_transport.dart' show PortalResponseException;
 
-/// Why an active control session ended.
-enum PortalSessionEnd {
-  /// The app called [PortalComputerUse.stop] or [PortalComputerUse.close].
-  stopped,
-
-  /// The desktop closed the session, for example from its sharing indicator.
-  revoked,
-
-  /// The screen saver or lock screen became active.
-  locked,
-
-  /// The user session is logging out or ending.
-  sessionEnding,
-
-  /// The desktop closed the lock monitor, so locks can no longer be detected.
-  monitorLost,
-}
+/// The portal name for [ComputerSessionEnd].
+typedef PortalSessionEnd = ComputerSessionEnd;
 
 /// The desktop cannot report screen locks (Inhibit monitor unavailable).
 class PortalLockMonitorUnavailable implements Exception {
@@ -49,7 +35,12 @@ class PortalLockMonitorUnavailable implements Exception {
 /// The session ends when the app stops it, the desktop revokes it, the screen
 /// locks, or the user session ends. [ended] reports the reason. Keys and
 /// buttons that are still pressed are released when the app stops a session.
-class PortalComputerUse {
+///
+/// As a [Computer]: [screenshot] returns the full stream frame as PNG;
+/// [cursorPosition] returns the last position this client set, because the
+/// portal cannot report the pointer; composite actions are built from button
+/// and motion events.
+class PortalComputerUse implements Computer {
   final PortalTransport _transport;
 
   /// When true, [start] fails unless the desktop provides an Inhibit monitor
@@ -72,6 +63,7 @@ class PortalComputerUse {
   final Future<PortalFrameSource> Function(int, int) _openFrames;
   final _heldKeysyms = <int>[];
   final _heldButtons = <int>[];
+  Point? _lastSet;
   final _ended = StreamController<PortalSessionEnd>.broadcast();
 
   PortalComputerUse({
@@ -91,13 +83,18 @@ class PortalComputerUse {
     this.requireLockMonitor = true,
   }) : _openFrames = openFrames ?? PipeWireFrames.open;
 
+  @override
   bool get isActive => _session != null && _streamNode != null && !_disposed;
   Size? get sharedSize => isActive ? _size : null;
+
+  @override
+  Size? get screenSize => sharedSize;
 
   /// Whether the desktop reports screen locks for the active session.
   bool get lockMonitored => isActive && _monitor != null;
 
   /// One event each time an active session ends.
+  @override
   Stream<PortalSessionEnd> get ended => _ended.stream;
 
   void _checkOpen() {
@@ -324,6 +321,7 @@ class PortalComputerUse {
       throw StateError('Frame belongs to an inactive or different session');
     }
     final point = frame.logicalPoint(x, y, imageSize: imageSize);
+    _lastSet = Point(point.x.round(), point.y.round());
     return _input('NotifyPointerMotionAbsolute', [
       DBusUint32(_streamNode!),
       DBusDouble(point.x),
@@ -353,12 +351,14 @@ class PortalComputerUse {
     ]);
   }
 
+  @override
   Future<void> moveTo(int x, int y) {
     if (!isActive) throw StateError('No approved remote desktop session');
     final size = _size!;
     if (x < 0 || y < 0 || x >= size.width || y >= size.height) {
       throw RangeError('Pointer coordinates are outside the shared monitor');
     }
+    _lastSet = Point(x, y);
     return _input('NotifyPointerMotionAbsolute', [
       DBusUint32(_streamNode!),
       DBusDouble(x.toDouble()),
@@ -380,15 +380,98 @@ class PortalComputerUse {
     if (pressed) _heldButtons.add(code);
   }
 
+  @override
   Future<void> click([MouseButton mouseButton = MouseButton.left]) async {
     await button(mouseButton, pressed: true);
     await button(mouseButton, pressed: false);
   }
 
+  @override
+  Future<void> press([MouseButton mouseButton = MouseButton.left]) =>
+      button(mouseButton, pressed: true);
+
+  @override
+  Future<void> release([MouseButton mouseButton = MouseButton.left]) =>
+      button(mouseButton, pressed: false);
+
+  @override
+  Future<void> clickAt(
+    int x,
+    int y, [
+    MouseButton mouseButton = MouseButton.left,
+  ]) async {
+    await moveTo(x, y);
+    await click(mouseButton);
+  }
+
+  /// Two clicks. The desktop decides whether they form a double-click.
+  @override
+  Future<void> doubleClick([MouseButton mouseButton = MouseButton.left]) async {
+    await click(mouseButton);
+    await click(mouseButton);
+  }
+
+  @override
+  Future<void> doubleClickAt(
+    int x,
+    int y, [
+    MouseButton mouseButton = MouseButton.left,
+  ]) async {
+    await moveTo(x, y);
+    await doubleClick(mouseButton);
+  }
+
+  /// Button down at [from], motion to [to], button up. Both points are
+  /// checked before any input. The button is released if the motion fails.
+  @override
+  Future<void> drag(
+    Point from,
+    Point to, [
+    MouseButton mouseButton = MouseButton.left,
+  ]) async {
+    if (!isActive) throw StateError('No approved remote desktop session');
+    final size = _size!;
+    for (final p in [from, to]) {
+      if (p.x < 0 || p.y < 0 || p.x >= size.width || p.y >= size.height) {
+        throw RangeError('Pointer coordinates are outside the shared monitor');
+      }
+    }
+    await moveTo(from.x, from.y);
+    await press(mouseButton);
+    try {
+      await moveTo(to.x, to.y);
+    } finally {
+      // An ended session releases held buttons itself.
+      if (isActive) await release(mouseButton);
+    }
+  }
+
+  /// The last position that this client set in this session. The portal
+  /// cannot report the pointer, so [CursorPosition.isLastSet] is true.
+  @override
+  Future<CursorPosition> cursorPosition() async {
+    if (!isActive) throw StateError('No approved remote desktop session');
+    final point = _lastSet;
+    if (point == null) {
+      throw const ComputerActionUnsupported(
+        'cursorPosition',
+        'the desktop portal cannot report the pointer, and this session has '
+            'not moved it yet',
+      );
+    }
+    return CursorPosition(point, isLastSet: true);
+  }
+
+  /// [Computer] scroll: positive [deltaY] scrolls up, positive [deltaX]
+  /// scrolls right. One wheel step per unit. See [scrollSteps].
+  @override
+  Future<void> scroll(int deltaX, int deltaY) =>
+      scrollSteps(vertical: -deltaY, horizontal: deltaX);
+
   /// Scroll by wheel steps at the current pointer position.
   /// Positive [vertical] scrolls down. Positive [horizontal] scrolls right.
   /// Each value must be in -1000..1000.
-  Future<void> scroll({int vertical = 0, int horizontal = 0}) async {
+  Future<void> scrollSteps({int vertical = 0, int horizontal = 0}) async {
     for (final steps in [vertical, horizontal]) {
       if (steps < -1000 || steps > 1000) {
         throw RangeError.range(steps, -1000, 1000, 'steps');
@@ -434,8 +517,34 @@ class PortalComputerUse {
 
   /// Press a key combination such as `ctrl+shift+n`, then release it in
   /// reverse order. Unknown names throw before any key is pressed.
-  Future<void> tapKeys(String combo) async {
-    final keysyms = parsePortalKeyCombo(combo);
+  Future<void> tapKeys(String combo) => _tapKeysyms(parsePortalKeyCombo(combo));
+
+  @override
+  Future<void> tap(String key) => tapKeysym(portalKeysym(key));
+
+  /// Unknown names throw before any key is pressed.
+  @override
+  Future<void> tapWithModifiers(String key, List<String> modifiers) {
+    if (key.isEmpty) throw ArgumentError('Key cannot be empty');
+    return _tapKeysyms([...modifiers.map(portalKeysym), portalKeysym(key)]);
+  }
+
+  @override
+  Future<void> keyDown(String key) => this.key(key, pressed: true);
+
+  @override
+  Future<void> keyUp(String key) => this.key(key, pressed: false);
+
+  /// Full stream frame as PNG. The size limits do not apply; the caller
+  /// resizes. Throws [StateError] when the session is inactive.
+  @override
+  Future<ComputerScreenshot?> screenshot({
+    required int maxSmallDimension,
+    required int maxLargeDimension,
+    int quality = 80,
+  }) async => ComputerScreenshot((await captureFrame()).png, 'image/png');
+
+  Future<void> _tapKeysyms(List<int> keysyms) async {
     final pressed = <int>[];
     try {
       for (final value in keysyms) {
@@ -452,6 +561,7 @@ class PortalComputerUse {
   }
 
   /// Send text as keysyms. This is not clipboard paste or an input-method API.
+  @override
   Future<void> type(String text) async {
     final keysyms = text.runes.map(keysymForRune).toList();
     for (final value in keysyms) {
@@ -482,6 +592,7 @@ class PortalComputerUse {
     _identity = Object();
     _heldKeysyms.clear();
     _heldButtons.clear();
+    _lastSet = null;
     final closed = _closed, monitorClosed = _monitorClosed;
     _closed = null;
     _monitorClosed = null;

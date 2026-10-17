@@ -4,15 +4,20 @@ on:
   pull_request:
 permissions:
   contents: read
+env:
+  FLUTTER_VERSION: '3.47.1'
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          channel: stable
-          flutter-version: '3.47.1'
+      # A plain clone: flutter-action uses actions/cache by tag, which the
+      # organization SHA-pinning rule rejects.
+      - name: Install Flutter
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
       - run: flutter pub get
       # I3: the Linux code starts no process.
       - run: flutter test test/no_process_spawn_test.dart

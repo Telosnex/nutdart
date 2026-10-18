@@ -5,3 +5,5 @@ library;
 export 'src/computer.dart';
 export 'src/nutdart_model.dart';
 export 'src/portal/portal_computer_use.dart';
+export 'src/portal/xkb_layout.dart'
+    show XkbKeysyms, XkbLayout, activeLayoutFromSettings, resolveTypeKeysyms;

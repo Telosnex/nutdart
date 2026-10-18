@@ -8,6 +8,7 @@ import '../computer.dart';
 import '../nutdart_model.dart';
 import 'portal_keys.dart';
 import 'portal_transport.dart';
+import 'xkb_layout.dart';
 import 'pipewire_frames.dart';
 import 'portal_frame.dart';
 
@@ -65,12 +66,14 @@ class PortalComputerUse implements Computer {
   final _heldButtons = <int>[];
   Point? _lastSet;
   final _ended = StreamController<PortalSessionEnd>.broadcast();
+  final Future<XkbKeysyms> Function() _activeLayout;
 
   PortalComputerUse({
     Duration consentTimeout = const Duration(minutes: 3),
     this.requireLockMonitor = true,
   }) : _transport = DBusPortalTransport(timeout: consentTimeout),
-       _openFrames = PipeWireFrames.open {
+       _openFrames = PipeWireFrames.open,
+       _activeLayout = activeGnomeKeysyms {
     if (!Platform.isLinux) {
       throw UnsupportedError('Desktop portals require Linux');
     }
@@ -81,7 +84,9 @@ class PortalComputerUse implements Computer {
     this._transport, {
     Future<PortalFrameSource> Function(int, int)? openFrames,
     this.requireLockMonitor = true,
-  }) : _openFrames = openFrames ?? PipeWireFrames.open;
+    Future<XkbKeysyms> Function()? activeLayout,
+  }) : _openFrames = openFrames ?? PipeWireFrames.open,
+       _activeLayout = activeLayout ?? activeGnomeKeysyms;
 
   @override
   bool get isActive => _session != null && _streamNode != null && !_disposed;
@@ -564,6 +569,18 @@ class PortalComputerUse implements Computer {
   @override
   Future<void> type(String text) async {
     final keysyms = text.runes.map(keysymForRune).toList();
+    for (final value in keysyms) {
+      await tapKeysym(value);
+    }
+  }
+
+  /// [type] for GNOME. Mutter drops any keysym that is not on the active
+  /// layout, and the portal call still succeeds. This checks every
+  /// character against the active layout first and sends nothing if any
+  /// is missing ([ComputerActionUnsupported] names them).
+  Future<void> typeOnActiveLayout(String text) async {
+    if (!isActive) throw StateError('No approved remote desktop session');
+    final keysyms = resolveTypeKeysyms(text, await _activeLayout());
     for (final value in keysyms) {
       await tapKeysym(value);
     }

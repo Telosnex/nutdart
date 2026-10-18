@@ -663,6 +663,98 @@ void main() {
     });
   });
 
+  group('typeOnActiveLayout', () {
+    // A US-like layout: ASCII letters, space, Return, plus Greek_OMEGA.
+    final layout = XkbKeysyms('test', {
+      ...'abc'.runes,
+      0x20,
+      0xff0d,
+      0x7d9,
+    }, (rune) => rune == 0x3a9 ? 0x7d9 : 0);
+    setUp(() {
+      portal = PortalComputerUse.withTransport(
+        transport,
+        activeLayout: () async => layout,
+      );
+    });
+
+    test('a missing character sends nothing and names it', () async {
+      await portal.start();
+      await expectLater(
+        portal.typeOnActiveLayout('ab é c日'),
+        throwsA(
+          isA<ComputerActionUnsupported>().having(
+            (e) => e.reason,
+            'reason',
+            allOf(contains('"é"'), contains('"日"'), contains('(test)')),
+          ),
+        ),
+      );
+      expect(transport.inputs, isEmpty);
+    });
+
+    test('uses the legacy keysym the layout has', () async {
+      await portal.start();
+      await portal.typeOnActiveLayout('aΩ\n');
+      expect(inputArgs(transport).map((a) => a[0].asInt32()).toList(), [
+        0x61,
+        0x61,
+        0x7d9,
+        0x7d9,
+        0xff0d,
+        0xff0d,
+      ]);
+    });
+
+    test('inactive session reads no layout', () async {
+      var reads = 0;
+      portal = PortalComputerUse.withTransport(
+        transport,
+        activeLayout: () async {
+          reads++;
+          return layout;
+        },
+      );
+      await expectLater(portal.typeOnActiveLayout('a'), throwsStateError);
+      expect(reads, 0);
+    });
+  });
+
+  group('activeLayoutFromSettings', () {
+    DBusArray sources(List<(String, String)> list) =>
+        DBusArray(DBusSignature('(ss)'), [
+          for (final (t, i) in list) DBusStruct([DBusString(t), DBusString(i)]),
+        ]);
+    test('prefers the first mru source and splits the variant', () {
+      final l = activeLayoutFromSettings({
+        'sources': sources([('xkb', 'us'), ('xkb', 'de+nodeadkeys')]),
+        'mru-sources': sources([('xkb', 'de+nodeadkeys'), ('xkb', 'us')]),
+        'current': const DBusUint32(0),
+        'xkb-options': DBusArray.string(['compose:ralt', 'caps:none']),
+      });
+      expect(
+        (l.layout, l.variant, l.options),
+        ('de', 'nodeadkeys', 'compose:ralt,caps:none'),
+      );
+    });
+    test('falls back to sources[current]', () {
+      final l = activeLayoutFromSettings({
+        'sources': sources([('xkb', 'us'), ('xkb', 'gr')]),
+        'mru-sources': sources([]),
+        'current': const DBusUint32(1),
+      });
+      expect(l.layout, 'gr');
+    });
+    test('an input method source is refused', () {
+      expect(
+        () => activeLayoutFromSettings({
+          'mru-sources': sources([('ibus', 'anthy')]),
+        }),
+        throwsA(isA<ComputerActionUnsupported>()),
+      );
+    });
+  });
+
   group('Computer interface', () {
     test('scroll uses the native sign: positive deltaY is up', () async {
       await portal.start();

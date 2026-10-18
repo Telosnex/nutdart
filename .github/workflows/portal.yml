@@ -27,6 +27,8 @@ jobs:
       # I3: the Linux code starts no process.
       - run: flutter test test/no_process_spawn_test.dart
       - run: flutter test test/portal_computer_use_test.dart test/portal_png_pixels_test.dart
+      # Both public libraries must compile for web, which has no dart:ffi.
+      - run: flutter test --platform chrome test/web_compile_test.dart
   # Real GNOME desktop, headless: consent, typing, refusals, stop.
   # See tool/ci/gnome/run.sh.
   gnome-desktop:

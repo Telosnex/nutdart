@@ -8,6 +8,7 @@
 MMSize getMainDisplaySize(void)
 {
 	Display *display = XGetMainDisplay();
+	if (display == NULL) return MMSizeMake(0, 0);
 	const int screen = DefaultScreen(display);
 
 	return MMSizeMake((size_t)DisplayWidth(display, screen),

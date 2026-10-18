@@ -303,6 +303,7 @@ uint8_t* copyBitmapFullJpeg_LINUX(int32_t maxSmallDim, int32_t maxLargeDim,
     
     // Get screen size
     MMSize screenSize = getMainDisplaySize();
+    if (screenSize.width == 0 || screenSize.height == 0) return NULL;
     
     // Use region capture for full screen
     return copyBitmapRegionJpeg_LINUX(0, 0, screenSize.width, screenSize.height,

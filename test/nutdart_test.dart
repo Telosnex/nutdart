@@ -2,6 +2,17 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutdart/nutdart.dart';
+// `Nutdart.isAvailable` exists only in the FFI build (not the web/stub export).
+import 'package:nutdart/src/nutdart_real.dart' show Nutdart;
+
+// Keyboard calls go to the native library. Without it, `tapWithModifiers`
+// throws StateError (unlike the other calls, which no-op), and with it the
+// test sends real keystrokes, which needs macOS accessibility permission.
+// So the test only runs when the library is loaded.
+final String? _keyboardSkipReason = Nutdart.isAvailable
+    ? null
+    : 'native library not loaded (build nutdart.framework / libnutdart.so); '
+          'Keyboard calls would throw StateError';
 
 void main() {
   group('Nutdart basic tests', () {
@@ -104,6 +115,6 @@ void main() {
       expect(() => Keyboard.paste(), returnsNormally);
       expect(() => Keyboard.enter(), returnsNormally);
       expect(() => Keyboard.escape(), returnsNormally);
-    });
+    }, skip: _keyboardSkipReason);
   });
 }

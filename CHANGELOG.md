@@ -1,17 +1,24 @@
-## Unreleased
+## 0.2.0
 
-* Replace Flutter platform-plugin/SPM builds with a Dart build hook and Kiln:
-  verified desktop prebuilts, source-key matching and a source-build fallback.
-* Use generated `@Native` code-asset bindings instead of framework/DLL-name
-  loading. Broken desktop installations now fail instead of silently no-oping.
-* Require Dart 3.10 / Flutter 3.38; macOS native builds target macOS 12+.
-* Add shared Telosnex Kiln release/check workflows, SHA-pinned actions and
-  Renovate. Test all six desktop targets, web JS/Wasm and GNOME portal flows.
-* Assert native asset loading in tests; make physical mouse/keyboard/capture
-  tests opt-in and run them only on an isolated X11 desktop in CI.
-* Fix standalone macOS CMake ARC flags and CoreMedia/CoreVideo linkage.
-* Fix the standalone Windows Unicode window-title build and Linux highlight
-  linkage; fail Linux builds with unresolved symbols.
+### Breaking
+* Requires Dart 3.10 / Flutter 3.38 or newer.
+* macOS 12 or newer is required (was 10.14).
+* The native library is now a Dart build-hook code asset, not a Flutter
+  platform plugin (no Swift Package Manager, CocoaPods or plugin
+  registration). On desktop, a missing or broken native library is now an
+  error instead of silently turning every call into a no-op. Mobile and web
+  behave as before.
+
+### Added
+* SHA-256-verified prebuilt desktop libraries via
+  [Kiln](https://pub.dev/packages/kiln) for Windows, Linux and macOS
+  (x64 and ARM64), with a source-build fallback. Choose with the
+  `native_build` hook user-define: `auto` (default), `download` or `source`.
+  See `native_artifacts/README.md`.
+
+### Fixed
+* Windows: window titles use the Unicode APIs (`GetWindowTextW`).
+* Linux: the window-highlight code is now linked into the library.
 
 ## 0.1.0
 

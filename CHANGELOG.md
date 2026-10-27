@@ -1,3 +1,18 @@
+## Unreleased
+
+* Replace Flutter platform-plugin/SPM builds with a Dart build hook and Kiln:
+  verified desktop prebuilts, source-key matching and a source-build fallback.
+* Use generated `@Native` code-asset bindings instead of framework/DLL-name
+  loading. Broken desktop installations now fail instead of silently no-oping.
+* Require Dart 3.10 / Flutter 3.38; macOS native builds target macOS 12+.
+* Add shared Telosnex Kiln release/check workflows, SHA-pinned actions and
+  Renovate. Test all six desktop targets, web JS/Wasm and GNOME portal flows.
+* Assert native asset loading in tests; make physical mouse/keyboard/capture
+  tests opt-in and run them only on an isolated X11 desktop in CI.
+* Fix standalone macOS CMake ARC flags and CoreMedia/CoreVideo linkage.
+* Fix the standalone Windows Unicode window-title build and Linux highlight
+  linkage; fail Linux builds with unresolved symbols.
+
 ## 0.1.0
 
 ### Breaking

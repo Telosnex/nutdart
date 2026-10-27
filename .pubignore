@@ -1,0 +1,16 @@
+# Not used by the hook or the runtime.
+# .pubignore replaces .gitignore, so repeat generated-output exclusions.
+**/build/
+**/.dart_tool/
+**/pubspec.lock
+**/.DS_Store
+*.log
+*.pyc
+/.github/
+/dev/
+/tool/ci/
+/android/
+/ios/
+/linux/
+/macos/
+/windows/

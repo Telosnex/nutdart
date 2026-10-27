@@ -1,5 +1,11 @@
 # Run with `dart run ffigen --config ffigen.yaml`.
 name: NutdartBindings
+ffi-native:
+  asset-id: 'package:nutdart/nutdart_bindings_generated.dart'
+functions:
+  symbol-address:
+    include:
+      - 'cu_.*'
 description: |
   Bindings for `src/nutdart.h`.
 

@@ -1,0 +1,117 @@
+name: Integration
+
+on:
+  push:
+    branches: [main, 'ci/**']
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  native:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux x64, runner: ubuntu-24.04, device: linux }
+          - { name: Linux ARM64, runner: ubuntu-24.04-arm, device: linux }
+          - { name: macOS ARM64, runner: macos-26, device: macos }
+          - { name: macOS x64, runner: macos-15-intel, device: macos }
+          - { name: Windows x64, runner: windows-2025, device: windows }
+          - { name: Windows ARM64, runner: windows-11-arm, device: windows }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
+      - run: flutter pub get --no-example
+      - run: dart tool/kiln/prepare.dart
+      - if: runner.os == 'Linux'
+        run: sudo apt-get install -y -qq xvfb libgtk-3-dev libxkbcommon0 xkb-data
+      # Resolves every native asset symbol, rather than passing with unloaded
+      # bindings. Physical automation is never run on a developer's desktop.
+      - run: flutter test --reporter expanded
+      - name: AOT app code asset
+        run: |
+          dart build cli --target tool/native_asset_smoke.dart --output "$RUNNER_TEMP/nutdart-smoke"
+          executable="$RUNNER_TEMP/nutdart-smoke/bundle/bin/native_asset_smoke"
+          if [[ "$RUNNER_OS" == Windows ]]; then executable="$executable.exe"; fi
+          "$executable"
+      - name: Flutter app code asset
+        working-directory: example
+        env:
+          DEVICE: ${{ matrix.device }}
+        run: |
+          flutter pub get
+          run=(flutter test integration_test/native_asset_test.dart -d "$DEVICE" --reporter expanded)
+          if [[ "$RUNNER_OS" == Linux ]]; then run=(xvfb-run -a "${run[@]}"); fi
+          "${run[@]}"
+      - if: runner.os == 'Linux'
+        name: Automation on an isolated X11 desktop
+        env:
+          NUTDART_AUTOMATION_TESTS: '1'
+        run: xvfb-run -a flutter test test/nutdart_test.dart --reporter expanded
+
+  web:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Web Linux x64 Chrome dart2js, flags: '' }
+          - { name: Web Linux x64 Chrome dart2wasm, flags: '--wasm' }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
+      - run: flutter pub get --no-example
+      # Flutter's test orchestrator also runs the host's native hook, even for
+      # browser-only suites. Until a prebuilt matches, it needs source tools.
+      - run: dart tool/kiln/prepare.dart
+      - run: flutter test --platform chrome ${{ matrix.flags }} test/web_compile_test.dart --reporter expanded
+
+  gnome-desktop:
+    name: Linux x64 GNOME Wayland
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install headless GNOME and portals
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gnome-shell mutter xdg-desktop-portal xdg-desktop-portal-gnome \
+            pipewire wireplumber dbus-bin dbus-daemon at-spi2-core \
+            python3-gi gir1.2-gtk-4.0 gir1.2-atspi-2.0 xkb-data \
+            gsettings-desktop-schemas
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
+      - run: flutter pub get --no-example
+      - run: dart tool/kiln/prepare.dart
+      - name: Approve, type, refuse missing characters, stop
+        run: tool/ci/gnome/run.sh type
+      - name: Approve with remote interaction off (I1)
+        run: tool/ci/gnome/run.sh no-interaction
+      - name: Deny (I1)
+        run: tool/ci/gnome/run.sh deny
+      - name: Desktop logs
+        if: failure()
+        run: tail -n 80 /tmp/nutdart-gnome-ci/*.log

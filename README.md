@@ -1,6 +1,6 @@
 # nutdart
 
-A powerful Flutter FFI plugin built on libnut-core for **desktop automation** that provides comprehensive mouse control, keyboard automation, and screen capture capabilities across Windows, macOS, and Linux platforms.
+A Dart/Flutter FFI package built on libnut-core for **desktop automation** that provides mouse control, keyboard automation, and screen capture across Windows, macOS, and Linux.
 
 Developed by [Telosnex](https://telosnex.com) for integrating with Anthropic's Claude LLM computer use tool.
 
@@ -41,13 +41,21 @@ Add `nutdart` to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  nutdart: ^0.0.1
+  nutdart: ^0.1.0
 ```
 
 Then run:
 ```bash
 flutter pub get
 ```
+
+The development version uses Dart build hooks and [Kiln](https://github.com/Telosnex/kiln)
+for SHA-256-verified desktop prebuilts, with a source-build fallback. It requires
+Dart 3.10 / Flutter 3.38 or newer; no platform plugin, SPM or CocoaPods setup is
+needed. Desktop permissions and Linux system-library dependencies still apply.
+Mobile remains unsupported; web exposes no-op stubs.
+See [Native builds and releases](native_artifacts/README.md) for build modes,
+dependencies, the six desktop targets and the shared CI/release workflow.
 
 ## 🔧 Usage
 
@@ -177,7 +185,7 @@ void automateTask() async {
 
 ## 🔒 Platform Availability
 
-This plugin is designed exclusively for **desktop platforms**:
+This package is designed exclusively for **desktop platforms**:
 
 | Platform | Support | Notes |
 |----------|---------|-------|
@@ -194,16 +202,23 @@ This plugin is designed exclusively for **desktop platforms**:
 - **Graceful Degradation**: Automatic fallback to no-op stubs on unsupported environments (web, mobile)
 - **Screen Capture**: JPEG compression happens in native code for maximum efficiency
 
-## 🔧 Developming on the plugin
+## 🔧 Developing the package
 
 ### Building Native Code
 
-The plugin automatically builds native libraries for each platform:
+The build hook downloads matching desktop prebuilts or builds from source:
 
-- **macOS/iOS**: Uses Xcode and Swift Package Manager (iOS is a stub)
+- **macOS**: Uses CMake and Xcode's Clang
 - **Windows**: Uses CMake and MSVC
 - **Linux**: Uses CMake and GCC
-- **Android**: Uses Gradle and NDK (stub only)
+- **Web/mobile**: No native desktop library; unsupported/no-op Dart APIs
+
+See [Native builds and releases](native_artifacts/README.md) for dependencies
+and the shared workflows. `flutter test` does not send physical input unless
+explicitly opted in; CI runs those tests only on an isolated X11 desktop.
+An AOT CLI smoke app can be built with
+`dart build cli --target tool/native_asset_smoke.dart` (not `dart compile exe`,
+which does not bundle build-hook assets).
 
 #### Regenerating FFI Bindings
 

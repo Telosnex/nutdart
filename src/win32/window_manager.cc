@@ -41,10 +41,10 @@ MMRect getWindowRect(const WindowHandle windowHandle) {
 std::string getWindowTitle(const WindowHandle windowHandle) {
     auto hWnd = reinterpret_cast<HWND>(windowHandle);
     if (IsWindow(hWnd)) {
-        auto BUFFER_SIZE = GetWindowTextLength(hWnd) + 1;
+        auto BUFFER_SIZE = GetWindowTextLengthW(hWnd) + 1;
         if (BUFFER_SIZE) {
             auto windowTitle = new WCHAR[BUFFER_SIZE];
-            if (GetWindowText(hWnd, windowTitle, BUFFER_SIZE)) {
+            if (GetWindowTextW(hWnd, windowTitle, BUFFER_SIZE)) {
                 // Convert wide string to narrow string
                 int size_needed = WideCharToMultiByte(CP_UTF8, 0, windowTitle, -1, NULL, 0, NULL, NULL);
                 std::string result(size_needed - 1, 0);

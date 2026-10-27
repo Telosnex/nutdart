@@ -91,7 +91,18 @@ void main() {
     });
   });
 
-  group('Nutdart no-op safety', () {
+  group('Nutdart desktop automation', () {
+    test('X11 moves the cursor and captures a real JPEG', () {
+      final size = Screen.getSize();
+      expect(size.width, greaterThan(100));
+      expect(size.height, greaterThan(100));
+      Mouse.moveTo(50, 60);
+      expect(Mouse.getPosition(), const Point(50, 60));
+      final jpeg = Screen.capture(maxSmallDimension: 100, quality: 50);
+      expect(jpeg, isNotNull);
+      expect(jpeg!.take(2), [0xff, 0xd8]);
+    }, skip: !Platform.isLinux);
+
     test('Mouse operations do not throw', () {
       expect(() => Mouse.moveTo(100, 100), returnsNormally);
       expect(() => Mouse.moveToPoint(Point(100, 100)), returnsNormally);

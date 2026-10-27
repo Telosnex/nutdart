@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 
 project(nutdart VERSION 0.0.1 LANGUAGES C CXX)
 
@@ -67,7 +67,6 @@ elseif(APPLE)
         ${CORE_FOUNDATION_FRAMEWORK}
         ${APPLICATION_SERVICES_FRAMEWORK}
         ${IOKIT_FRAMEWORK}
-        ${SCREENCAPTUREKIT_FRAMEWORK}
         ${AVFOUNDATION_FRAMEWORK}
         ${CORE_MEDIA_FRAMEWORK}
         ${CORE_VIDEO_FRAMEWORK}
@@ -109,6 +108,9 @@ endif()
 target_compile_definitions(nutdart PUBLIC DART_SHARED_LIB)
 
 if(APPLE)
+    # ScreenCaptureKit arrived in 12.3. Its calls already have @available
+    # guards; weak linking lets the older capture path work on macOS 12.0.
+    target_link_options(nutdart PRIVATE "-Wl,-weak_framework,ScreenCaptureKit")
     # Match the former SPM targets: ScreenCaptureKit uses ARC, while
     # highlightwindow.m explicitly manages NSAutoreleasePool and releases.
     set_source_files_properties(macos/screengrab.m macos/screencapturekit_objc.m

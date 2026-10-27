@@ -67,7 +67,9 @@ jobs:
           persist-credentials: false
       - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
       - run: flutter pub get --no-example
-      # No C toolchain or native runtime files should be needed for the web.
+      # Flutter's test orchestrator also runs the host's native hook, even for
+      # browser-only suites. Until a prebuilt matches, it needs source tools.
+      - run: dart tool/kiln/prepare.dart
       - run: flutter test --platform chrome ${{ matrix.flags }} test/web_compile_test.dart --reporter expanded
 
   gnome-desktop:

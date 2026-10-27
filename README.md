@@ -41,7 +41,7 @@ Add `nutdart` to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  nutdart: ^0.0.1
+  nutdart: ^0.1.0
 ```
 
 Then run:
@@ -185,7 +185,7 @@ void automateTask() async {
 
 ## 🔒 Platform Availability
 
-This plugin is designed exclusively for **desktop platforms**:
+This package is designed exclusively for **desktop platforms**:
 
 | Platform | Support | Notes |
 |----------|---------|-------|
@@ -202,16 +202,23 @@ This plugin is designed exclusively for **desktop platforms**:
 - **Graceful Degradation**: Automatic fallback to no-op stubs on unsupported environments (web, mobile)
 - **Screen Capture**: JPEG compression happens in native code for maximum efficiency
 
-## 🔧 Developming on the plugin
+## 🔧 Developing the package
 
 ### Building Native Code
 
-The plugin automatically builds native libraries for each platform:
+The build hook downloads matching desktop prebuilts or builds from source:
 
-- **macOS/iOS**: Uses Xcode and Swift Package Manager (iOS is a stub)
+- **macOS**: Uses CMake and Xcode's Clang
 - **Windows**: Uses CMake and MSVC
 - **Linux**: Uses CMake and GCC
-- **Android**: Uses Gradle and NDK (stub only)
+- **Web/mobile**: No native desktop library; unsupported/no-op Dart APIs
+
+See [Native builds and releases](native_artifacts/README.md) for dependencies
+and the shared workflows. `flutter test` does not send physical input unless
+explicitly opted in; CI runs those tests only on an isolated X11 desktop.
+An AOT CLI smoke app can be built with
+`dart build cli --target tool/native_asset_smoke.dart` (not `dart compile exe`,
+which does not bundle build-hook assets).
 
 #### Regenerating FFI Bindings
 

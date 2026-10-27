@@ -10,6 +10,8 @@
 * Assert native asset loading in tests; make physical mouse/keyboard/capture
   tests opt-in and run them only on an isolated X11 desktop in CI.
 * Fix standalone macOS CMake ARC flags and CoreMedia/CoreVideo linkage.
+* Fix the standalone Windows Unicode window-title build and Linux highlight
+  linkage; fail Linux builds with unresolved symbols.
 
 ## 0.1.0
 

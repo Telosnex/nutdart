@@ -29,8 +29,6 @@ jobs:
       - run: sudo apt-get install -y -qq libxkbcommon0 xkb-data
       - run: dart format --output=none --set-exit-if-changed lib test hook tool
       - run: dart analyze --fatal-infos lib test hook tool
-      # With no matching manifest yet, Kiln builds from source. Once the
-      # first manifest is merged this also checks its key and hosted files.
-      - if: hashFiles('native_artifacts/prebuilt.json') != ''
-        run: dart run kiln:check
+      # A source change requires a matching native release before merge.
+      - run: dart run kiln:check --download
       - run: flutter test --reporter expanded

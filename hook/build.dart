@@ -25,7 +25,8 @@ void main(List<String> args) async {
     }
 
     final logger = Logger('')
-      ..level = Level.INFO
+      // MSVC sends build errors to stdout, which CMakeBuilder logs at FINE.
+      ..level = Level.ALL
       ..onRecord.listen(
         (record) => stderr.writeln('[nutdart] ${record.message}'),
       );

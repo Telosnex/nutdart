@@ -27,12 +27,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: Linux x64, runner: ubuntu-24.04 }
-          - { name: Linux ARM64, runner: ubuntu-24.04-arm }
-          - { name: macOS ARM64, runner: macos-26 }
-          - { name: macOS x64, runner: macos-15-intel }
-          - { name: Windows x64, runner: windows-2025 }
-          - { name: Windows ARM64, runner: windows-11-arm }
+          - { name: Linux x64, runner: ubuntu-24.04, device: linux }
+          - { name: Linux ARM64, runner: ubuntu-24.04-arm, device: linux }
+          - { name: macOS ARM64, runner: macos-26, device: macos }
+          - { name: macOS x64, runner: macos-15-intel, device: macos }
+          - { name: Windows x64, runner: windows-2025, device: windows }
+          - { name: Windows ARM64, runner: windows-11-arm, device: windows }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -41,10 +41,25 @@ jobs:
       - run: flutter pub get --no-example
       - run: dart tool/kiln/prepare.dart
       - if: runner.os == 'Linux'
-        run: sudo apt-get install -y -qq xvfb libxkbcommon0 xkb-data
+        run: sudo apt-get install -y -qq xvfb libgtk-3-dev libxkbcommon0 xkb-data
       # Resolves every native asset symbol, rather than passing with unloaded
       # bindings. Physical automation is never run on a developer's desktop.
       - run: flutter test --reporter expanded
+      - name: AOT app code asset
+        run: |
+          dart build cli --target tool/native_asset_smoke.dart --output "$RUNNER_TEMP/nutdart-smoke"
+          executable="$RUNNER_TEMP/nutdart-smoke/bundle/bin/native_asset_smoke"
+          if [[ "$RUNNER_OS" == Windows ]]; then executable="$executable.exe"; fi
+          "$executable"
+      - name: Flutter app code asset
+        working-directory: example
+        env:
+          DEVICE: ${{ matrix.device }}
+        run: |
+          flutter pub get
+          run=(flutter test integration_test/native_asset_test.dart -d "$DEVICE" --reporter expanded)
+          if [[ "$RUNNER_OS" == Linux ]]; then run=(xvfb-run -a "${run[@]}"); fi
+          "${run[@]}"
       - if: runner.os == 'Linux'
         name: Automation on an isolated X11 desktop
         env:

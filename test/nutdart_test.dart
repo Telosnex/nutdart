@@ -101,7 +101,7 @@ void main() {
       final jpeg = Screen.capture(maxSmallDimension: 100, quality: 50);
       expect(jpeg, isNotNull);
       expect(jpeg!.take(2), [0xff, 0xd8]);
-    }, skip: !Platform.isLinux);
+    }, skip: !_automation || !Platform.isLinux);
 
     test('Mouse operations do not throw', () {
       expect(() => Mouse.moveTo(100, 100), returnsNormally);

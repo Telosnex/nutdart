@@ -1,0 +1,5 @@
+# Hosted label used by the existing GNOME portal CI; older actionlint versions
+# do not know this newer runner image yet.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

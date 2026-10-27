@@ -1,0 +1,9 @@
+# Not used by the hook or the runtime.
+/.github/
+/dev/
+/tool/ci/
+/android/
+/ios/
+/linux/
+/macos/
+/windows/

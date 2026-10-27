@@ -1,6 +1,6 @@
 # nutdart
 
-A powerful Flutter FFI plugin built on libnut-core for **desktop automation** that provides comprehensive mouse control, keyboard automation, and screen capture capabilities across Windows, macOS, and Linux platforms.
+A Dart/Flutter FFI package built on libnut-core for **desktop automation** that provides mouse control, keyboard automation, and screen capture across Windows, macOS, and Linux.
 
 Developed by [Telosnex](https://telosnex.com) for integrating with Anthropic's Claude LLM computer use tool.
 
@@ -48,6 +48,14 @@ Then run:
 ```bash
 flutter pub get
 ```
+
+The development version uses Dart build hooks and [Kiln](https://github.com/Telosnex/kiln)
+for SHA-256-verified desktop prebuilts, with a source-build fallback. It requires
+Dart 3.10 / Flutter 3.38 or newer; no platform plugin, SPM or CocoaPods setup is
+needed. Desktop permissions and Linux system-library dependencies still apply.
+Mobile remains unsupported; web exposes no-op stubs.
+See [Native builds and releases](native_artifacts/README.md) for build modes,
+dependencies, the six desktop targets and the shared CI/release workflow.
 
 ## 🔧 Usage
 

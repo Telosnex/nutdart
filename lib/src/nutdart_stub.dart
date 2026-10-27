@@ -15,8 +15,16 @@ class Mouse {
   static void clickAt(int x, int y, [MouseButton button = MouseButton.left]) {}
   static void clickAtPoint(Point p, [MouseButton button = MouseButton.left]) {}
   static void doubleClick([MouseButton button = MouseButton.left]) {}
-  static void doubleClickAt(int x, int y, [MouseButton button = MouseButton.left]) {}
-  static void drag(Point from, Point to, [MouseButton button = MouseButton.left]) {}
+  static void doubleClickAt(
+    int x,
+    int y, [
+    MouseButton button = MouseButton.left,
+  ]) {}
+  static void drag(
+    Point from,
+    Point to, [
+    MouseButton button = MouseButton.left,
+  ]) {}
   static void scroll(int deltaX, int deltaY) {}
   static void scrollVertical(int delta) {}
   static void scrollHorizontal(int delta) {}
@@ -57,15 +65,26 @@ class Keyboard {
 class Screen {
   Screen._();
   static Size getSize() => const Size(0, 0);
-  static Uint8List? capture({int? maxSmallDimension, int? maxLargeDimension, int quality = 80}) => null;
-  static Uint8List? captureRegion(int x, int y, int width, int height,
-          {int? maxSmallDimension, int? maxLargeDimension, int quality = 80}) =>
-      null;
+  static Uint8List? capture({
+    int? maxSmallDimension,
+    int? maxLargeDimension,
+    int quality = 80,
+  }) => null;
+  static Uint8List? captureRegion(
+    int x,
+    int y,
+    int width,
+    int height, {
+    int? maxSmallDimension,
+    int? maxLargeDimension,
+    int quality = 80,
+  }) => null;
 }
 
 // Misc utilities ------------------------------------------------------------
 class ComputerUse {
   ComputerUse._();
-  static Future<void> sleep(int milliseconds) => Future.delayed(Duration(milliseconds: milliseconds));
+  static Future<void> sleep(int milliseconds) =>
+      Future.delayed(Duration(milliseconds: milliseconds));
   static Future<void> sleepDuration(Duration d) => Future.delayed(d);
 }

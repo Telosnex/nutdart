@@ -14,6 +14,10 @@ elseif(UNIX)
     set(PLATFORM_NAME "linux")
 endif()
 
+if(APPLE)
+    enable_language(OBJC OBJCXX)
+endif()
+
 # Source files from libnut-core
 set(COMMON_SOURCES
     nutdart.c
@@ -33,7 +37,7 @@ if(WIN32)
         win32/highlightwindow.c
         win32/window_manager.cc
     )
-    set(PLATFORM_LIBS user32 gdi32 ole32 windowscodecs)
+    set(PLATFORM_LIBS user32 gdi32 ole32 oleaut32 windowscodecs)
 elseif(APPLE)
     set(PLATFORM_SOURCES
         macos/keycode.c
@@ -54,6 +58,8 @@ elseif(APPLE)
     find_library(IOKIT_FRAMEWORK IOKit)
     find_library(SCREENCAPTUREKIT_FRAMEWORK ScreenCaptureKit)
     find_library(AVFOUNDATION_FRAMEWORK AVFoundation)
+    find_library(CORE_MEDIA_FRAMEWORK CoreMedia)
+    find_library(CORE_VIDEO_FRAMEWORK CoreVideo)
     set(PLATFORM_LIBS
         ${CARBON_FRAMEWORK}
         ${COCOA_FRAMEWORK}
@@ -63,6 +69,8 @@ elseif(APPLE)
         ${IOKIT_FRAMEWORK}
         ${SCREENCAPTUREKIT_FRAMEWORK}
         ${AVFOUNDATION_FRAMEWORK}
+        ${CORE_MEDIA_FRAMEWORK}
+        ${CORE_VIDEO_FRAMEWORK}
     )
 elseif(UNIX)
     set(PLATFORM_SOURCES
@@ -80,7 +88,7 @@ elseif(UNIX)
     pkg_check_modules(XTST REQUIRED xtst)
     pkg_check_modules(XINERAMA REQUIRED xinerama)
     pkg_check_modules(JPEG REQUIRED libjpeg)
-    set(PLATFORM_LIBS ${X11_LIBRARIES} ${XTST_LIBRARIES} ${XINERAMA_LIBRARIES} ${JPEG_LIBRARIES})
+    set(PLATFORM_LIBS ${X11_LIBRARIES} ${XTST_LIBRARIES} ${XINERAMA_LIBRARIES} ${JPEG_LIBRARIES} m)
     include_directories(${X11_INCLUDE_DIRS} ${XTST_INCLUDE_DIRS} ${XINERAMA_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS})
 endif()
 
@@ -94,6 +102,15 @@ target_include_directories(nutdart PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(nutdart ${PLATFORM_LIBS})
 
 target_compile_definitions(nutdart PUBLIC DART_SHARED_LIB)
+
+if(APPLE)
+    # Match the former SPM targets: ScreenCaptureKit uses ARC, while
+    # highlightwindow.m explicitly manages NSAutoreleasePool and releases.
+    set_source_files_properties(macos/screengrab.m macos/screencapturekit_objc.m
+        PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    set_source_files_properties(macos/highlightwindow.m macos/window_manager.mm
+        PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
+endif()
 
 # Output configuration
 set_target_properties(nutdart PROPERTIES

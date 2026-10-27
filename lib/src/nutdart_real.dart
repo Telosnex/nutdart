@@ -1,8 +1,5 @@
-// Desktop/FFI implementation of the Nutdart API.
-// This file is only included when `dart.library.ffi` is available.  On
-// platforms where the native shared library cannot be loaded (e.g. Android,
-// iOS) the `_bindings` variable will be `null`, and all public methods will
-// silently become no-ops.
+// Desktop FFI implementation. The build hook supplies the native code asset;
+// mobile retains its unsupported/no-op behavior. Web uses nutdart_stub.dart.
 
 import 'dart:ffi';
 import 'dart:io' show Platform;
@@ -10,55 +7,14 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart' as ffi;
 import 'package:nutdart/src/nutdart_model.dart';
 
-import '../nutdart_bindings_generated.dart';
+import '../nutdart_bindings_generated.dart' show CUBitmap;
+import '../nutdart_bindings_generated.dart' as bindings;
 
-const String _libName = 'nutdart';
-
-// Try to load the dynamic library.  If this fails we return `null` so the rest
-// of the file can gracefully degrade into no-ops.
-DynamicLibrary? _tryOpenDynamicLibrary() {
-  try {
-    if (Platform.isMacOS) {
-      return DynamicLibrary.open('$_libName.framework/$_libName');
-    }
-    if (Platform.isWindows) {
-      return DynamicLibrary.open('$_libName.dll');
-    }
-    if (Platform.isLinux) {
-      return DynamicLibrary.open('lib$_libName.so');
-    }
-    // Mobile or other platforms – not supported.
-    return null;
-  } on Object {
-    // Any error while loading results in a null library.
-    return null;
-  }
-}
-
-// Load library and bindings lazily and safely
-DynamicLibrary? _dylib;
-NutdartBindings? _bindings;
-bool _initialized = false;
-
-void _tryInit() {
-  if (_initialized) return;
-  _initialized = true;
-  try {
-    _dylib = _tryOpenDynamicLibrary();
-    if (_dylib != null) {
-      _bindings = NutdartBindings(_dylib!);
-    }
-  } on Object {
-    // Any error results in null bindings
-    _dylib = null;
-    _bindings = null;
-  }
-}
-
-bool get _available {
-  _tryInit();
-  return _bindings != null;
-}
+// Resolve through the code asset, never a framework name or the loader's
+// search path. A broken desktop installation must fail, not silently no-op.
+final bool _available =
+    (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
+    bindings.addresses.cu_screen_get_size != nullptr;
 
 // The Nutdart class can be used for any additional functionality
 // For now, it's just a placeholder.
@@ -85,8 +41,7 @@ class Mouse {
 
   /// Move mouse to specified coordinates
   static void moveTo(int x, int y) {
-    _tryInit();
-    _bindings?.cu_mouse_move(x, y);
+    if (_available) bindings.cu_mouse_move(x, y);
   }
 
   /// Move mouse to a Point
@@ -96,8 +51,7 @@ class Mouse {
 
   /// Click mouse button at current position
   static void click([MouseButton button = MouseButton.left]) {
-    _tryInit();
-    _bindings?.cu_mouse_click(_mouseButtonValue(button));
+    if (_available) bindings.cu_mouse_click(_mouseButtonValue(button));
   }
 
   /// Click mouse button at specified coordinates
@@ -116,8 +70,7 @@ class Mouse {
 
   /// Double-click mouse button
   static void doubleClick([MouseButton button = MouseButton.left]) {
-    _tryInit();
-    _bindings?.cu_mouse_double_click(_mouseButtonValue(button));
+    if (_available) bindings.cu_mouse_double_click(_mouseButtonValue(button));
   }
 
   /// Double-click at specified coordinates
@@ -136,20 +89,20 @@ class Mouse {
     Point to, [
     MouseButton button = MouseButton.left,
   ]) {
-    _tryInit();
-    _bindings?.cu_mouse_drag(
-      from.x,
-      from.y,
-      to.x,
-      to.y,
-      _mouseButtonValue(button),
-    );
+    if (_available) {
+      bindings.cu_mouse_drag(
+        from.x,
+        from.y,
+        to.x,
+        to.y,
+        _mouseButtonValue(button),
+      );
+    }
   }
 
   /// Scroll mouse wheel
   static void scroll(int deltaX, int deltaY) {
-    _tryInit();
-    _bindings?.cu_mouse_scroll(deltaX, deltaY);
+    if (_available) bindings.cu_mouse_scroll(deltaX, deltaY);
   }
 
   /// Scroll vertically
@@ -164,22 +117,19 @@ class Mouse {
 
   /// Get current mouse position
   static Point getPosition() {
-    _tryInit();
-    if (_bindings == null) return const Point(0, 0);
-    final pos = _bindings!.cu_mouse_get_position();
+    if (!_available) return const Point(0, 0);
+    final pos = bindings.cu_mouse_get_position();
     return Point(pos.x, pos.y);
   }
 
   /// Press and hold mouse button
   static void press([MouseButton button = MouseButton.left]) {
-    _tryInit();
-    _bindings?.cu_mouse_toggle(1, _mouseButtonValue(button));
+    if (_available) bindings.cu_mouse_toggle(1, _mouseButtonValue(button));
   }
 
   /// Release mouse button
   static void release([MouseButton button = MouseButton.left]) {
-    _tryInit();
-    _bindings?.cu_mouse_toggle(0, _mouseButtonValue(button));
+    if (_available) bindings.cu_mouse_toggle(0, _mouseButtonValue(button));
   }
 }
 
@@ -189,11 +139,10 @@ class Keyboard {
 
   /// Tap a key
   static void tap(String key) {
-    _tryInit();
-    if (_bindings == null) return;
+    if (!_available) return;
     final keyPtr = key.toNativeUtf8();
     try {
-      _bindings!.cu_keyboard_key_tap(keyPtr.cast<Char>());
+      bindings.cu_keyboard_key_tap(keyPtr.cast<Char>());
     } finally {
       ffi.malloc.free(keyPtr);
     }
@@ -204,8 +153,7 @@ class Keyboard {
   /// Valid modifiers: "cmd", "alt", "control", "shift", "meta", "fn"
   /// The C library expects comma-separated modifiers and handles main thread dispatch internally.
   static void tapWithModifiers(String key, List<String> modifiers) {
-    _tryInit();
-    if (_bindings == null) {
+    if (!_available) {
       throw StateError('Nutdart bindings not available');
     }
 
@@ -243,7 +191,7 @@ class Keyboard {
     final keyPtr = key.toNativeUtf8();
     final flagsPtr = modifierString.toNativeUtf8();
     try {
-      _bindings!.cu_keyboard_key_tap_with_flags(
+      bindings.cu_keyboard_key_tap_with_flags(
         keyPtr.cast<Char>(),
         flagsPtr.cast<Char>(),
       );
@@ -255,11 +203,10 @@ class Keyboard {
 
   /// Type a string
   static void type(String text) {
-    _tryInit();
-    if (_bindings == null) return;
+    if (!_available) return;
     final textPtr = text.toNativeUtf8();
     try {
-      _bindings!.cu_keyboard_type_string(textPtr.cast<Char>());
+      bindings.cu_keyboard_type_string(textPtr.cast<Char>());
     } finally {
       ffi.malloc.free(textPtr);
     }
@@ -267,11 +214,10 @@ class Keyboard {
 
   /// Press and hold a key
   static void keyDown(String key) {
-    _tryInit();
-    if (_bindings == null) return;
+    if (!_available) return;
     final keyPtr = key.toNativeUtf8();
     try {
-      _bindings!.cu_keyboard_key_down(keyPtr.cast<Char>());
+      bindings.cu_keyboard_key_down(keyPtr.cast<Char>());
     } finally {
       ffi.malloc.free(keyPtr);
     }
@@ -279,11 +225,10 @@ class Keyboard {
 
   /// Release a key
   static void keyUp(String key) {
-    _tryInit();
-    if (_bindings == null) return;
+    if (!_available) return;
     final keyPtr = key.toNativeUtf8();
     try {
-      _bindings!.cu_keyboard_key_up(keyPtr.cast<Char>());
+      bindings.cu_keyboard_key_up(keyPtr.cast<Char>());
     } finally {
       ffi.malloc.free(keyPtr);
     }
@@ -319,9 +264,8 @@ class Screen {
 
   /// Get screen size
   static Size getSize() {
-    _tryInit();
-    if (_bindings == null) return const Size(0, 0);
-    final size = _bindings!.cu_screen_get_size();
+    if (!_available) return const Size(0, 0);
+    final size = bindings.cu_screen_get_size();
     return Size(size.width, size.height);
   }
 
@@ -331,8 +275,7 @@ class Screen {
     int? maxLargeDimension,
     int quality = 80,
   }) {
-    _tryInit();
-    if (_bindings == null) return null;
+    if (!_available) return null;
     return _captureScreen(
       maxSmallDimension: maxSmallDimension,
       maxLargeDimension: maxLargeDimension,
@@ -350,8 +293,7 @@ class Screen {
     int? maxLargeDimension,
     int quality = 80,
   }) {
-    _tryInit();
-    if (_bindings == null) return null;
+    if (!_available) return null;
     return _captureScreen(
       x: x,
       y: y,
@@ -372,7 +314,7 @@ class Screen {
     int? maxLargeDimension,
     int quality = 80,
   }) {
-    if (_bindings == null) return null;
+    if (!_available) return null;
 
     // If resize parameters are provided, use the JPEG functions
     if (maxSmallDimension != null || maxLargeDimension != null) {
@@ -381,7 +323,7 @@ class Screen {
         Pointer<Uint8> jpegPtr;
 
         if (x != null && y != null && width != null && height != null) {
-          jpegPtr = _bindings!.cu_screen_capture_region_jpeg(
+          jpegPtr = bindings.cu_screen_capture_region_jpeg(
             x,
             y,
             width,
@@ -392,7 +334,7 @@ class Screen {
             sizePtr,
           );
         } else {
-          jpegPtr = _bindings!.cu_screen_capture_full_jpeg(
+          jpegPtr = bindings.cu_screen_capture_full_jpeg(
             maxSmallDimension ?? -1,
             maxLargeDimension ?? -1,
             quality,
@@ -407,7 +349,7 @@ class Screen {
         final jpegSize = sizePtr.value;
         final data = Uint8List.fromList(jpegPtr.asTypedList(jpegSize));
 
-        _bindings!.cu_screen_free_jpeg(jpegPtr);
+        bindings.cu_screen_free_jpeg(jpegPtr);
 
         return data;
       } finally {
@@ -419,9 +361,9 @@ class Screen {
     Pointer<CUBitmap> bitmapPtr;
 
     if (x != null && y != null && width != null && height != null) {
-      bitmapPtr = _bindings!.cu_screen_capture_region(x, y, width, height);
+      bitmapPtr = bindings.cu_screen_capture_region(x, y, width, height);
     } else {
-      bitmapPtr = _bindings!.cu_screen_capture_full();
+      bitmapPtr = bindings.cu_screen_capture_full();
     }
 
     if (bitmapPtr == nullptr) {
@@ -432,7 +374,7 @@ class Screen {
     final dataSize = bitmap.bytewidth * bitmap.height;
     final data = Uint8List.fromList(bitmap.data.asTypedList(dataSize));
 
-    _bindings!.cu_screen_free_capture(bitmapPtr);
+    bindings.cu_screen_free_capture(bitmapPtr);
 
     return data;
   }

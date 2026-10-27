@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@a453a47774e92f6e07c6147911008cd65cbb9607 # v0.4.0
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
       - run: flutter pub get --no-example
       - run: dart tool/kiln/prepare.dart
       - if: runner.os == 'Linux'
@@ -65,7 +65,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@a453a47774e92f6e07c6147911008cd65cbb9607 # v0.4.0
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
       - run: flutter pub get --no-example
       # No C toolchain or native runtime files should be needed for the web.
       - run: flutter test --platform chrome ${{ matrix.flags }} test/web_compile_test.dart --reporter expanded
@@ -86,7 +86,7 @@ jobs:
             pipewire wireplumber dbus-bin dbus-daemon at-spi2-core \
             python3-gi gir1.2-gtk-4.0 gir1.2-atspi-2.0 xkb-data \
             gsettings-desktop-schemas
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@a453a47774e92f6e07c6147911008cd65cbb9607 # v0.4.0
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
       - run: flutter pub get --no-example
       - run: dart tool/kiln/prepare.dart
       - name: Approve, type, refuse missing characters, stop

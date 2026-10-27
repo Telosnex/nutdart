@@ -80,6 +80,7 @@ elseif(UNIX)
         linux/screen.c
         linux/screengrab.c
         linux/screengrab_jpeg.c
+        linux/highlightwindow.c
         linux/window_manager.cc
         linux/xdisplay.c
     )
@@ -100,6 +101,10 @@ target_include_directories(nutdart PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Link libraries
 target_link_libraries(nutdart ${PLATFORM_LIBS})
+
+if(UNIX AND NOT APPLE)
+    target_link_options(nutdart PRIVATE "-Wl,--no-undefined")
+endif()
 
 target_compile_definitions(nutdart PUBLIC DART_SHARED_LIB)
 

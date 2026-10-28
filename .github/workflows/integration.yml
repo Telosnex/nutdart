@@ -19,25 +19,19 @@ defaults:
     shell: bash
 
 jobs:
-  native:
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.runner }}
+  # Desktop: the jobs share the steps of the first (YAML anchor); what
+  # differs is in each job's env.
+  desktop-linux-x64:
+    name: Linux x64
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { name: Linux x64, runner: ubuntu-24.04, device: linux }
-          - { name: Linux ARM64, runner: ubuntu-24.04-arm, device: linux }
-          - { name: macOS ARM64, runner: macos-26, device: macos }
-          - { name: macOS x64, runner: macos-15-intel, device: macos }
-          - { name: Windows x64, runner: windows-2025, device: windows }
-          - { name: Windows ARM64, runner: windows-11-arm, device: windows }
-    steps:
+    env:
+      DEVICE: linux
+    steps: &native_steps
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@cba77fc0d4330f1bef81193c53cd7dd976f0ebcf # v0.5.3
       - run: flutter pub get --no-example
       - run: dart tool/kiln/prepare.dart
       - if: runner.os == 'Linux'
@@ -53,8 +47,6 @@ jobs:
           "$executable"
       - name: Flutter app code asset
         working-directory: example
-        env:
-          DEVICE: ${{ matrix.device }}
         run: |
           flutter pub get
           run=(flutter test integration_test/native_asset_test.dart -d "$DEVICE" --reporter expanded)
@@ -66,28 +58,77 @@ jobs:
           NUTDART_AUTOMATION_TESTS: '1'
         run: xvfb-run -a flutter test test/nutdart_test.dart --reporter expanded
 
-  web:
-    name: ${{ matrix.name }}
+  desktop-linux-arm64:
+    name: Linux ARM64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    env:
+      DEVICE: linux
+    steps: *native_steps
+
+  desktop-macos-arm64:
+    name: macOS ARM64
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVICE: macos
+    steps: *native_steps
+
+  desktop-macos-x64:
+    name: macOS x64
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    env:
+      DEVICE: macos
+    steps: *native_steps
+
+  desktop-windows-x64:
+    name: Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      DEVICE: windows
+    steps: *native_steps
+
+  desktop-windows-arm64:
+    name: Windows ARM64
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    env:
+      DEVICE: windows
+    steps: *native_steps
+
+  # Desktop browsers: the jobs share the steps of the first (YAML anchor);
+  # COMPILER selects the build.
+  web-linux-chrome-dart2js:
+    name: Web Linux x64 Chrome dart2js
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { name: Web Linux x64 Chrome dart2js, flags: '' }
-          - { name: Web Linux x64 Chrome dart2wasm, flags: '--wasm' }
-    steps:
+    env:
+      COMPILER: dart2js
+    steps: &web_steps
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@cba77fc0d4330f1bef81193c53cd7dd976f0ebcf # v0.5.3
       - run: flutter pub get --no-example
       # Flutter's test orchestrator also runs the host's native hook, even for
       # browser-only suites. Until a prebuilt matches, it needs source tools.
       - run: dart tool/kiln/prepare.dart
-      - run: flutter test --platform chrome ${{ matrix.flags }} test/web_compile_test.dart --reporter expanded
+      - run: |
+          args=()
+          if [[ "$COMPILER" == dart2wasm ]]; then args+=(--wasm); fi
+          flutter test --platform chrome "${args[@]}" test/web_compile_test.dart --reporter expanded
 
-  gnome-desktop:
+  web-linux-chrome-dart2wasm:
+    name: Web Linux x64 Chrome dart2wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      COMPILER: dart2wasm
+    steps: *web_steps
+
+  desktop-linux-x64-gnome:
     name: Linux x64 GNOME Wayland
     runs-on: ubuntu-26.04
     timeout-minutes: 30
@@ -103,7 +144,7 @@ jobs:
             pipewire wireplumber dbus-bin dbus-daemon at-spi2-core \
             python3-gi gir1.2-gtk-4.0 gir1.2-atspi-2.0 xkb-data \
             gsettings-desktop-schemas
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@cba77fc0d4330f1bef81193c53cd7dd976f0ebcf # v0.5.3
       - run: flutter pub get --no-example
       - run: dart tool/kiln/prepare.dart
       - name: Approve, type, refuse missing characters, stop

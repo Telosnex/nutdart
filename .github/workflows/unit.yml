@@ -23,7 +23,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c77f43af135fa5163072164f49e7160e974b753f # v0.4.0
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@cba77fc0d4330f1bef81193c53cd7dd976f0ebcf # v0.5.3
+      - uses: Telosnex/telosnex_ci_tools/actions/lint@cba77fc0d4330f1bef81193c53cd7dd976f0ebcf # v0.5.3
       - run: flutter pub get --no-example
       - run: dart tool/kiln/prepare.dart
       - run: sudo apt-get install -y -qq libxkbcommon0 xkb-data

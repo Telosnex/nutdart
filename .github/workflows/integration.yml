@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@cba77fc0d4330f1bef81193c53cd7dd976f0ebcf # v0.5.3
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@0554f3662445d678e2effbd838d15968d673f7af # v0.5.6
       - run: flutter pub get --no-example
       - run: dart tool/kiln/prepare.dart
       - if: runner.os == 'Linux'
@@ -110,7 +110,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@cba77fc0d4330f1bef81193c53cd7dd976f0ebcf # v0.5.3
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@0554f3662445d678e2effbd838d15968d673f7af # v0.5.6
       - run: flutter pub get --no-example
       # Flutter's test orchestrator also runs the host's native hook, even for
       # browser-only suites. Until a prebuilt matches, it needs source tools.
@@ -144,7 +144,7 @@ jobs:
             pipewire wireplumber dbus-bin dbus-daemon at-spi2-core \
             python3-gi gir1.2-gtk-4.0 gir1.2-atspi-2.0 xkb-data \
             gsettings-desktop-schemas
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@cba77fc0d4330f1bef81193c53cd7dd976f0ebcf # v0.5.3
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@0554f3662445d678e2effbd838d15968d673f7af # v0.5.6
       - run: flutter pub get --no-example
       - run: dart tool/kiln/prepare.dart
       - name: Approve, type, refuse missing characters, stop

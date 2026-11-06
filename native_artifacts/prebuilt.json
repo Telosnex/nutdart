@@ -1,16 +1,16 @@
 {
   "schema": 1,
-  "sourceKey": "ca567e5ab63ea320dd580007ff9b3686c720256246d79ff6697b184e2bc3fdca",
-  "release": "https://github.com/Telosnex/nutdart/releases/tag/native-ca567e5ab63ea320",
+  "sourceKey": "dd5633e2e0806377f0a7f0baac7651a37b2411f212051fb83f2279b61ed2fd1b",
+  "release": "https://github.com/Telosnex/nutdart/releases/tag/native-dd5633e2e0806377",
   "targets": {
     "linux-arm64": {
-      "runner": "ubuntu22-arm64 20261023.156.3",
+      "runner": "ubuntu22-arm64 20261101.179.1",
       "toolchain": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, cmake version 3.31.6",
       "files": [
         {
           "name": "libnutdart.so",
           "sha256": "d1c1e3d5dbe4ed40990b0cca941380879866646decff32e826243159d55aed9e",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-ca567e5ab63ea320/linux-arm64-libnutdart.so.gz",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/linux-arm64-libnutdart.so.gz",
           "downloadSha256": "4c17a4b0a0c4ae95f2d18ed59d9845d3a1edee7de26a83ca16b82f9b5688210a",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
@@ -18,13 +18,13 @@
       ]
     },
     "linux-x64": {
-      "runner": "ubuntu22 20261023.322.3",
+      "runner": "ubuntu22 20261101.347.1",
       "toolchain": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, cmake version 3.31.6",
       "files": [
         {
           "name": "libnutdart.so",
           "sha256": "ecc6a7119f5d3e4e07d3cdb18c2bd676fcfbf391dfd4b80dff1483359b055cb1",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-ca567e5ab63ea320/linux-x64-libnutdart.so.gz",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/linux-x64-libnutdart.so.gz",
           "downloadSha256": "38c70cb434b76c9cd6b41b6b1cd6892485ddf713807348a52dd071f9d7b696fb",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
@@ -32,14 +32,14 @@
       ]
     },
     "macos-arm64": {
-      "runner": "macos15 20260907.0337.1",
-      "toolchain": "Xcode 16.4, cmake version 4.4.3",
+      "runner": "macos15 20261104.0514.1",
+      "toolchain": "Xcode 16.4, cmake version 4.4.5",
       "minOSVersion": 12,
       "files": [
         {
           "name": "libnutdart.dylib",
           "sha256": "5ceb41573955aec756fc62b43942ea3d6b298a99ef1adb15ce172f42ef57858f",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-ca567e5ab63ea320/macos-arm64-libnutdart.dylib.gz",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/macos-arm64-libnutdart.dylib.gz",
           "downloadSha256": "daa08e01fb503db17fc7b515ed3d73247e8d03eb6735782170d4bed70915da07",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
@@ -47,14 +47,14 @@
       ]
     },
     "macos-x64": {
-      "runner": "macos15 20260907.0337.1",
-      "toolchain": "Xcode 16.4, cmake version 4.4.3",
+      "runner": "macos15 20261104.0514.1",
+      "toolchain": "Xcode 16.4, cmake version 4.4.5",
       "minOSVersion": 12,
       "files": [
         {
           "name": "libnutdart.dylib",
           "sha256": "4ba01f7b82f53cb9228997d68759dfe66192c845d058b363de68ac526eb9cd8d",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-ca567e5ab63ea320/macos-x64-libnutdart.dylib.gz",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/macos-x64-libnutdart.dylib.gz",
           "downloadSha256": "8e134c00ac7ce30548877e0034adbfb6adff1ef06f46c995f56acedd4205a1ad",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
@@ -62,28 +62,28 @@
       ]
     },
     "windows-arm64": {
-      "runner": "win11-vs2026-arm64 20261022.194.1",
-      "toolchain": "Visual Studio 18.11.1, cmake version 4.4.4",
+      "runner": "win11-vs2026-arm64 20261101.203.1",
+      "toolchain": "Visual Studio 18.11.3, cmake version 4.4.5",
       "files": [
         {
           "name": "nutdart.dll",
-          "sha256": "2501f272547044227407b48cf708a11c215f3365f2ddf6c83e60bc5dea20b885",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-ca567e5ab63ea320/windows-arm64-nutdart.dll.gz",
-          "downloadSha256": "e663f658e0787dc912545ec3686fab27069982751579b6c950b3fdbbb7fb3dc1",
+          "sha256": "4cd73ef4d44595b13944a7101c77a04415b5ab704aabe1b6353840338f5b95d4",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/windows-arm64-nutdart.dll.gz",
+          "downloadSha256": "d785e7bfc26832d277cba4571af0c779b9a581e2d2d1f4e523bfcc4a2ae6876e",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
         }
       ]
     },
     "windows-x64": {
-      "runner": "win22 20261022.344.1",
-      "toolchain": "Visual Studio 17.14.42, cmake version 3.31.6",
+      "runner": "win22 20261101.353.1",
+      "toolchain": "Visual Studio 17.14.44, cmake version 3.31.6",
       "files": [
         {
           "name": "nutdart.dll",
-          "sha256": "ace87b299d6edd2625682df662235cc57df01274b415c2e17f8991ff227bf7f7",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-ca567e5ab63ea320/windows-x64-nutdart.dll.gz",
-          "downloadSha256": "1109d2d4c6503e047744063f7d30490aa49e6490149460b2256fd789d236ba90",
+          "sha256": "d71840c25f75212bc51c0f7a13a584a4f9f9d020a973140acd7624625b20a713",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/windows-x64-nutdart.dll.gz",
+          "downloadSha256": "0add6cd617044f7d2db6bc2b82aa0380b9bbd6796474aa2368e8b2b93b798319",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
         }

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "sourceKey": "dd5633e2e0806377f0a7f0baac7651a37b2411f212051fb83f2279b61ed2fd1b",
-  "release": "https://github.com/Telosnex/nutdart/releases/tag/native-dd5633e2e0806377",
+  "sourceKey": "20f90080cd8b084bb395e2c99a2cac04bc61781983fbba7a94f6d2ac419d1155",
+  "release": "https://github.com/Telosnex/nutdart/releases/tag/native-20f90080cd8b084b",
   "targets": {
     "linux-arm64": {
       "runner": "ubuntu22-arm64 20261101.179.1",
@@ -10,7 +10,7 @@
         {
           "name": "libnutdart.so",
           "sha256": "d1c1e3d5dbe4ed40990b0cca941380879866646decff32e826243159d55aed9e",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/linux-arm64-libnutdart.so.gz",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-20f90080cd8b084b/linux-arm64-libnutdart.so.gz",
           "downloadSha256": "4c17a4b0a0c4ae95f2d18ed59d9845d3a1edee7de26a83ca16b82f9b5688210a",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
@@ -24,7 +24,7 @@
         {
           "name": "libnutdart.so",
           "sha256": "ecc6a7119f5d3e4e07d3cdb18c2bd676fcfbf391dfd4b80dff1483359b055cb1",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/linux-x64-libnutdart.so.gz",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-20f90080cd8b084b/linux-x64-libnutdart.so.gz",
           "downloadSha256": "38c70cb434b76c9cd6b41b6b1cd6892485ddf713807348a52dd071f9d7b696fb",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
@@ -39,7 +39,7 @@
         {
           "name": "libnutdart.dylib",
           "sha256": "5ceb41573955aec756fc62b43942ea3d6b298a99ef1adb15ce172f42ef57858f",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/macos-arm64-libnutdart.dylib.gz",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-20f90080cd8b084b/macos-arm64-libnutdart.dylib.gz",
           "downloadSha256": "daa08e01fb503db17fc7b515ed3d73247e8d03eb6735782170d4bed70915da07",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
@@ -54,7 +54,7 @@
         {
           "name": "libnutdart.dylib",
           "sha256": "4ba01f7b82f53cb9228997d68759dfe66192c845d058b363de68ac526eb9cd8d",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/macos-x64-libnutdart.dylib.gz",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-20f90080cd8b084b/macos-x64-libnutdart.dylib.gz",
           "downloadSha256": "8e134c00ac7ce30548877e0034adbfb6adff1ef06f46c995f56acedd4205a1ad",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
@@ -67,9 +67,9 @@
       "files": [
         {
           "name": "nutdart.dll",
-          "sha256": "4cd73ef4d44595b13944a7101c77a04415b5ab704aabe1b6353840338f5b95d4",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/windows-arm64-nutdart.dll.gz",
-          "downloadSha256": "d785e7bfc26832d277cba4571af0c779b9a581e2d2d1f4e523bfcc4a2ae6876e",
+          "sha256": "2bbc2e34237f4d949bc4ec81cca21b8d227d358121c8b837eacce045fa9523c2",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-20f90080cd8b084b/windows-arm64-nutdart.dll.gz",
+          "downloadSha256": "de02fd86bf5386e3ab1b57c4636d8c083984b31025f5464d5f500ea79d750cc1",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
         }
@@ -81,9 +81,9 @@
       "files": [
         {
           "name": "nutdart.dll",
-          "sha256": "d71840c25f75212bc51c0f7a13a584a4f9f9d020a973140acd7624625b20a713",
-          "url": "https://github.com/Telosnex/nutdart/releases/download/native-dd5633e2e0806377/windows-x64-nutdart.dll.gz",
-          "downloadSha256": "0add6cd617044f7d2db6bc2b82aa0380b9bbd6796474aa2368e8b2b93b798319",
+          "sha256": "06d3a6dd5dc4f9bfaf3d725d33c61b7eb95eb52cc188b19ae4c06b821a8b144d",
+          "url": "https://github.com/Telosnex/nutdart/releases/download/native-20f90080cd8b084b/windows-x64-nutdart.dll.gz",
+          "downloadSha256": "0ea43a9edb1232b30160da7f58c3ec33bc439729e8bafc65adabac8137cf10e7",
           "delivery": "bundle",
           "asset": "nutdart_bindings_generated.dart"
         }

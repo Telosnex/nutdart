@@ -174,10 +174,10 @@ packages:
     dependency: transitive
     description:
       name: kiln
-      sha256: "39c88aaa8bc52f026bc73ae487cc80826f583f530406d04c285fd835e5b9cf29"
+      sha256: "728cae716f33ec9bcdb2f5ebb451f0b62b8322925899e541a98f41525819477f"
       url: "https://pub.dev"
     source: hosted
-    version: "0.2.0"
+    version: "1.0.0"
   leak_tracker:
     dependency: transitive
     description:
@@ -256,7 +256,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.2.1"
+    version: "1.0.0"
   path:
     dependency: transitive
     description:

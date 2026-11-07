@@ -41,7 +41,7 @@ Add `nutdart` to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  nutdart: ^0.2.0
+  nutdart: ^1.0.0
 ```
 
 Then run:

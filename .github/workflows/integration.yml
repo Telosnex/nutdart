@@ -74,14 +74,6 @@ jobs:
       DEVICE: macos
     steps: *native_steps
 
-  desktop-macos-x64:
-    name: macOS x64
-    runs-on: macos-15-intel
-    timeout-minutes: 30
-    env:
-      DEVICE: macos
-    steps: *native_steps
-
   desktop-windows-x64:
     name: Windows x64
     runs-on: windows-2025

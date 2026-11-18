@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:nutdart/nutdart.dart';
+
 import 'dart:typed_data';
 
 void main() {
@@ -60,13 +61,10 @@ class _MyAppState extends State<MyApp> {
     try {
       // Capture with JPEG compression, max dimension 800px for display
       print('Calling Screen.capture...');
-      final data = Screen.capture(
-        maxSmallDimension: 800,
-        quality: 85,
-      );
-      
+      final data = Screen.capture(maxSmallDimension: 800, quality: 85);
+
       print('Screenshot data received: ${data?.length ?? 0} bytes');
-      
+
       setState(() {
         screenshotData = data;
         isCapturing = false;
@@ -91,31 +89,21 @@ class _MyAppState extends State<MyApp> {
     const spacerSmall = SizedBox(height: 10);
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Computer Use Demo'),
-        ),
+        appBar: AppBar(title: const Text('Computer Use Demo')),
         body: SingleChildScrollView(
           child: Container(
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  screenInfo,
-                  style: textStyle,
-                  textAlign: TextAlign.center,
-                ),
+                Text(screenInfo, style: textStyle, textAlign: TextAlign.center),
                 spacerSmall,
                 ElevatedButton(
                   onPressed: _getScreenSize,
                   child: const Text('Get Screen Size'),
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  mouseInfo,
-                  style: textStyle,
-                  textAlign: TextAlign.center,
-                ),
+                Text(mouseInfo, style: textStyle, textAlign: TextAlign.center),
                 spacerSmall,
                 ElevatedButton(
                   onPressed: _getMousePosition,
@@ -194,7 +182,7 @@ class _MyAppState extends State<MyApp> {
                       },
                       child: const Text('Test Empty Modifiers'),
                     );
-                  }
+                  },
                 ),
                 const SizedBox(height: 10),
                 Builder(
@@ -215,7 +203,7 @@ class _MyAppState extends State<MyApp> {
                       },
                       child: const Text('Test Cmd+C'),
                     );
-                  }
+                  },
                 ),
                 const SizedBox(height: 10),
                 Builder(
@@ -230,13 +218,15 @@ class _MyAppState extends State<MyApp> {
                           );
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error with Cmd+Shift+A: $e')),
+                            SnackBar(
+                              content: Text('Error with Cmd+Shift+A: $e'),
+                            ),
                           );
                         }
                       },
                       child: const Text('Test Cmd+Shift+A'),
                     );
-                  }
+                  },
                 ),
                 const SizedBox(height: 10),
                 Builder(
@@ -248,7 +238,9 @@ class _MyAppState extends State<MyApp> {
                           Keyboard.copy();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Called Keyboard.copy() successfully'),
+                              content: Text(
+                                'Called Keyboard.copy() successfully',
+                              ),
                             ),
                           );
                         } catch (e) {
@@ -259,14 +251,11 @@ class _MyAppState extends State<MyApp> {
                       },
                       child: const Text('Test copy() method'),
                     );
-                  }
+                  },
                 ),
                 const SizedBox(height: 20),
                 if (screenshotData != null) ...[
-                  const Text(
-                    'Screenshot:',
-                    style: textStyle,
-                  ),
+                  const Text('Screenshot:', style: textStyle),
                   const SizedBox(height: 10),
                   Container(
                     decoration: BoxDecoration(

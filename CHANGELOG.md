@@ -1,3 +1,7 @@
+## 1.0.1
+
+- Flutter 3.50 compatability
+
 ## 1.0.0
 
 - First stable release. Requires kiln 1.0.0, whose source key leaves out the pubspec's `version` and `description`, so a release that changes only those needs no new native build.

@@ -1,6 +1,6 @@
 name: nutdart
 description: "Automation plugin for Flutter desktop applications built on libnut-core"
-version: 1.0.0
+version: 1.0.1
 homepage: https://github.com/Telosnex/nutdart
 
 environment:

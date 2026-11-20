@@ -31,5 +31,8 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test hook tool
       - run: dart analyze --fatal-infos lib test hook tool
       # A source change requires a matching native release before merge.
+      # Authenticated: anonymous GitHub API calls share a small rate limit.
       - run: dart run kiln:check --download
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - run: flutter test --reporter expanded
